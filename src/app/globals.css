@@ -220,8 +220,8 @@
 .kpi2 {
   position: relative;
   overflow: hidden;
-  padding: 16px 18px 20px;
-  border-radius: 18px;
+  padding: 14px 15px 15px;
+  border-radius: 16px;
   background: #fff;
   border: 1px solid var(--ln);
   box-shadow:
@@ -264,10 +264,10 @@
   gap: 8px;
 }
 .kpi2-ic {
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   flex: none;
-  border-radius: 13px;
+  border-radius: 11px;
   display: grid;
   place-items: center;
   background: var(--kt);
@@ -276,24 +276,25 @@
 }
 .kpi2-l {
   position: relative;
-  margin-top: 13px;
-  font-size: 12px;
+  margin-top: 9px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--mu);
 }
 .kpi2-v {
   position: relative;
-  margin-top: 3px;
-  font-size: 26px;
+  margin-top: 2px;
+  font-size: 21px;
   font-weight: 800;
-  line-height: 1.15;
-  letter-spacing: -0.035em;
+  line-height: 1.2;
+  letter-spacing: -0.03em;
   color: var(--nv);
 }
 .kpi2-sub {
   position: relative;
-  margin-top: 5px;
-  font-size: 11.5px;
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.35;
   color: var(--mu);
 }
 .kpi2-bar {
@@ -932,15 +933,20 @@ table.t {
 }
 
 @media print {
+  /* Margin cetak dipegang @page, bukan oleh padding lembar. Dengan begitu isi
+     selalu berada di dalam area cetak A4 dan browser tidak perlu mengecilkan
+     dokumen (penyebab invoice keluar kecil atau terpotong). */
   @page {
     size: A4;
-    margin: 0;
+    margin: 12mm;
   }
 
-  /* Halaman tanpa invoice (mis. Laporan) tetap tercetak apa adanya. */
-  body:has(.a4) {
-    margin: 0;
-    background: #fff;
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: auto !important;
+    background: #fff !important;
   }
 
   /* Sisakan hanya rantai elemen yang memuat .a4. Shell aplikasi dibuang dari
@@ -969,14 +975,33 @@ table.t {
   }
 
   .a4 {
-    position: static;
-    width: 210mm;
-    min-height: auto;
-    margin: 0;
-    box-shadow: none;
+    position: static !important;
+    width: auto !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
     zoom: 1 !important;
+    transform: none !important;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
+  }
+
+  .a4 table {
+    width: 100% !important;
+  }
+
+  .a4 thead {
+    display: table-header-group;
+  }
+
+  .a4 tr,
+  .a4 th,
+  .a4 td {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 }
 
@@ -1827,15 +1852,15 @@ table.t {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: 18px 20px 8px;
+  padding: 14px 16px 6px;
 }
 .d2-card-h.d2-c {
   align-items: center;
   flex-wrap: wrap;
-  padding-bottom: 14px;
+  padding-bottom: 12px;
 }
 .d2-card-t {
-  font-size: 14.5px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--dink);
@@ -1891,7 +1916,7 @@ table.t {
   cursor: pointer;
 }
 .d2-gauge {
-  max-width: 300px;
+  max-width: 260px;
   margin: 0 auto;
 }
 .d2-metric {
@@ -1933,12 +1958,12 @@ table.t {
   background: transparent;
   border-bottom: 1px solid var(--dline);
   color: var(--dmu);
-  padding: 11px 20px;
+  padding: 9px 16px;
   font-size: 10.5px;
   letter-spacing: 0.06em;
 }
 .d2 .t td {
-  padding: 13px 20px;
+  padding: 10px 16px;
   border-bottom: 1px solid #f4f5f9;
   color: #3f3f46;
 }

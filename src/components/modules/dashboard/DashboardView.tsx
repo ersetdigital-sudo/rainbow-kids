@@ -231,7 +231,7 @@ export function DashboardView() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <KpiCard
             label="Omzet bulan ini"
             value={rp(mt)}
@@ -446,7 +446,7 @@ export function DashboardView() {
 
         <div className="grid lg:grid-cols-3 gap-4 mt-4">
           <motion.div
-            className="d2-card p-5 lg:col-span-2"
+            className="d2-card p-4 lg:col-span-2"
             {...fadeUp(0.42)}
           >
             <div className="flex justify-between items-center">
@@ -522,7 +522,7 @@ export function DashboardView() {
             </div>
           </motion.div>
 
-          <motion.div className="d2-card p-5" {...fadeUp(0.46)}>
+          <motion.div className="d2-card p-4" {...fadeUp(0.46)}>
             <div className="d2-card-t mb-3">Stok perlu restock</div>
             {low.map((v) => (
               <div
