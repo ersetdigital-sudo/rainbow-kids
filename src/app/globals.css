@@ -827,23 +827,51 @@ table.t {
 }
 
 @media print {
-  body * {
-    visibility: hidden;
-  }
-  .a4,
-  .a4 * {
-    visibility: visible;
-  }
-  .a4 {
-    position: absolute;
-    left: 0;
-    top: 0;
-    box-shadow: none;
-    margin: 0;
-  }
   @page {
     size: A4;
     margin: 0;
+  }
+
+  /* Halaman tanpa invoice (mis. Laporan) tetap tercetak apa adanya. */
+  body:has(.a4) {
+    margin: 0;
+    background: #fff;
+  }
+
+  /* Sisakan hanya rantai elemen yang memuat .a4. Shell aplikasi dibuang dari
+     layout (bukan cuma disembunyikan) supaya lebar dokumen cetak = lebar A4.
+     Kalau layout lebih lebar dari kertas, browser mengecilkan seluruh halaman
+     dan PDF-nya keluar mungil. */
+  body:has(.a4) :not(:has(.a4)):not(.a4):not(.a4 *) {
+    display: none !important;
+  }
+
+  body:has(.a4) .main,
+  body:has(.a4) main {
+    margin: 0 !important;
+    max-width: none !important;
+    width: auto !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    transform: none !important;
+  }
+
+  body:has(.a4) .invwrap {
+    overflow: visible !important;
+    background: #fff !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  .a4 {
+    position: static;
+    width: 210mm;
+    min-height: auto;
+    margin: 0;
+    box-shadow: none;
+    zoom: 1 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
   }
 }
 
