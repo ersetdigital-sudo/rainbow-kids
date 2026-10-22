@@ -359,6 +359,14 @@ export function SaleDetailDrawer({
           label="Tanggal transaksi"
           value={<b style={{ color: "var(--nv)" }}>{formatDate(sale.date)}</b>}
         />
+        <Row
+          label="Jenis pembayaran"
+          value={
+            <b style={{ color: "var(--nv)" }}>
+              {sale.type === "tempo" ? "Tempo" : "Tunai"}
+            </b>
+          }
+        />
         {sale.type === "tempo" && (
           <Row
             label="Jatuh tempo"

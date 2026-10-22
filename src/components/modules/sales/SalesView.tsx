@@ -93,12 +93,7 @@ export function SalesView() {
       label: "No. Invoice",
       render: (s) => <span className="font-semibold">{s.id}</span>,
     },
-    { key: "date", label: "Tanggal order", render: (s) => formatDate(s.date) },
-    {
-      key: "due",
-      label: "Jatuh tempo",
-      render: (s) => (s.due ? formatDate(s.due) : "—"),
-    },
+    { key: "date", label: "Tanggal", render: (s) => formatDate(s.date) },
     {
       key: "customer",
       label: "Pelanggan",
@@ -106,37 +101,10 @@ export function SalesView() {
       render: (s) => s.customer,
     },
     {
-      key: "type",
-      label: "Jenis",
-      render: (s) => (s.type === "tempo" ? "Tempo" : "Tunai"),
-    },
-    {
       key: "total",
       label: "Total jual",
       align: "right",
       render: (s) => <span className="num">{rp(saleTotal(s))}</span>,
-    },
-    {
-      key: "cost",
-      label: "Modal",
-      align: "right",
-      cellClass: "h-opt",
-      render: (s) => (
-        <span className="num" style={{ color: "var(--mu)" }}>
-          {rp(saleCost(s))}
-        </span>
-      ),
-    },
-    {
-      key: "ops",
-      label: "Biaya ops",
-      align: "right",
-      cellClass: "h-opt",
-      render: (s) => (
-        <span className="num" style={{ color: "var(--mu)" }}>
-          {rp(saleOps(s))}
-        </span>
-      ),
     },
     {
       key: "profit",
