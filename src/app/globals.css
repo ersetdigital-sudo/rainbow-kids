@@ -847,8 +847,8 @@ table.t {
   }
 }
 
-/* ---------------- Mobile: table jadi kartu ---------------- */
-@media (max-width: 767px) {
+/* ---------------- Mobile & tablet: table jadi kartu ---------------- */
+@media (max-width: 1023px) {
   .t thead {
     display: none;
   }
@@ -928,12 +928,6 @@ table.t {
   .t td select {
     max-width: 60%;
   }
-  h1 {
-    font-size: 22px !important;
-  }
-}
-
-@media (max-width: 767px) {
   .t tr {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -979,6 +973,12 @@ table.t {
   .t td input,
   .t td select {
     max-width: 100%;
+  }
+}
+
+@media (max-width: 767px) {
+  h1 {
+    font-size: 22px !important;
   }
   .tabs {
     margin-left: -16px;
