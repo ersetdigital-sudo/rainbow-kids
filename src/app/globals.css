@@ -844,78 +844,89 @@ table.t {
   display: flex;
   justify-content: flex-end;
   align-items: stretch;
-  padding: 0 !important;
+  padding: 14px !important;
   overflow: hidden;
-  background: rgba(4, 18, 63, 0.45);
-  backdrop-filter: blur(3px);
+  background: rgba(9, 15, 38, 0.48);
+  backdrop-filter: blur(6px) saturate(120%);
 }
 .mbox {
   width: 100%;
-  max-width: 600px;
-  height: 100vh;
-  height: 100dvh;
-  border-radius: 22px 0 0 22px;
+  max-width: 620px;
+  height: 100%;
+  border-radius: 26px;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: #fff;
-  box-shadow: -24px 0 60px -20px rgba(4, 18, 63, 0.45);
+  border: 1px solid rgba(4, 18, 63, 0.07);
+  box-shadow:
+    0 40px 90px -34px rgba(4, 18, 63, 0.55),
+    0 8px 22px -14px rgba(4, 18, 63, 0.28);
 }
 .mbox.wide {
-  max-width: 900px;
+  max-width: 940px;
 }
 .dhead {
-  padding: 20px 24px 16px;
+  flex: none;
+  padding: 22px 26px 18px;
   border-bottom: 1px solid var(--ln);
-  background: linear-gradient(180deg, #fff, #fbfcfe);
+  background: #fff;
 }
 .dgrip {
   display: none;
 }
 .dkick {
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #b08300;
+  color: #9a7200;
+  background: #fdf4dd;
+  border-radius: 6px;
+  padding: 3px 7px;
 }
 .dtitle {
-  font-size: 18px;
+  font-size: 21px;
   font-weight: 800;
   color: var(--nv);
-  letter-spacing: -0.02em;
-  margin-top: 2px;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  margin-top: 9px;
 }
 .dclose {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
   display: grid;
   place-items: center;
-  color: var(--mu);
-  border: 1px solid var(--ln);
+  color: #5b6480;
+  background: #f3f5fa;
+  border: 1px solid transparent;
   flex: none;
-  transition: 0.15s;
-  background: #fff;
   cursor: pointer;
+  transition: 0.16s;
 }
 .dclose:hover {
   background: var(--nv);
   color: #fff;
-  border-color: var(--nv);
 }
 .dbody {
   flex: 1;
   overflow-y: auto;
-  padding: 22px 24px;
+  padding: 22px 26px 26px;
+  background: #fff;
+  overscroll-behavior: contain;
 }
 .dfoot {
+  flex: none;
   display: flex;
   gap: 8px;
   justify-content: flex-end;
   flex-wrap: wrap;
-  padding: 14px 24px calc(14px + env(safe-area-inset-bottom));
+  padding: 16px 26px calc(16px + env(safe-area-inset-bottom));
   border-top: 1px solid var(--ln);
-  background: #fff;
+  background: #fbfcfe;
 }
 .dbody input,
 .dbody select {
@@ -950,25 +961,33 @@ table.t {
   .modal {
     align-items: flex-end;
   }
+  .modal {
+    padding: 0 !important;
+  }
   .mbox,
   .mbox.wide {
     max-width: none;
     height: 92dvh;
-    border-radius: 24px 24px 0 0;
+    border-radius: 26px 26px 0 0;
+    border-bottom: 0;
   }
   .dgrip {
     display: block;
-    width: 40px;
+    width: 42px;
     height: 4px;
     border-radius: 9px;
-    background: #d6dbe6;
-    margin: -8px auto 12px;
+    background: #dfe3ec;
+    margin: -6px auto 14px;
   }
   .dhead {
-    padding: 16px 18px 12px;
+    padding: 16px 18px 14px;
+  }
+  .dtitle {
+    font-size: 19px;
+    margin-top: 8px;
   }
   .dbody {
-    padding: 16px 18px;
+    padding: 16px 18px 22px;
   }
   .dfoot {
     padding: 12px 18px calc(12px + env(safe-area-inset-bottom));
@@ -1127,6 +1146,10 @@ table.t {
 .sdc {
   border-top: 1px solid var(--ln);
   padding: 16px 0;
+}
+.dbody > .sdc:first-child {
+  border-top: 0;
+  padding-top: 2px;
 }
 .sdh {
   display: flex;

@@ -107,19 +107,6 @@ export function SalesView() {
       render: (s) => <span className="num">{rp(saleTotal(s))}</span>,
     },
     {
-      key: "profit",
-      label: "Laba",
-      align: "right",
-      render: (s) => (
-        <span
-          className="num font-semibold"
-          style={{ color: saleProfit(s) >= 0 ? "var(--ok)" : "var(--er)" }}
-        >
-          {rp(saleProfit(s))}
-        </span>
-      ),
-    },
-    {
       key: "status",
       label: "Status bayar",
       render: (s) => <Badge tone={arStatus(s)}>{arStatus(s)}</Badge>,
