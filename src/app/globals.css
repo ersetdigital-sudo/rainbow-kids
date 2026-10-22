@@ -276,25 +276,23 @@
 }
 .kpi2-l {
   position: relative;
-  margin-top: 14px;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
+  margin-top: 13px;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--mu);
 }
 .kpi2-v {
   position: relative;
-  margin-top: 5px;
-  font-size: 24px;
+  margin-top: 3px;
+  font-size: 26px;
   font-weight: 800;
   line-height: 1.15;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.035em;
   color: var(--nv);
 }
 .kpi2-sub {
   position: relative;
-  margin-top: 4px;
+  margin-top: 5px;
   font-size: 11.5px;
   color: var(--mu);
 }
