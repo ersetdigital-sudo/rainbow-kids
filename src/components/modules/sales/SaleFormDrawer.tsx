@@ -97,7 +97,7 @@ export function SaleFormDrawer({
               Batal
             </button>
             <button type="button" className="btn p" onClick={submit}>
-              Simpan transaksi
+              Ajukan invoice
             </button>
           </>
         }
@@ -222,7 +222,7 @@ export function SaleFormDrawer({
                     style={{ color: "var(--mu)" }}
                   >
                     Standar {rp(info.v.price)} · modal {rp(info.v.cost)}{" "}
-                    (internal) ·{" "}
+                    (internal) · laba {rp(it.price - info.v.cost)}/unit ·{" "}
                     {hist
                       ? `histori jual ${rp(hist.min)} – ${rp(hist.max)} (${hist.count} transaksi, terakhir ${rp(hist.last)})`
                       : "belum ada histori harga jual"}
@@ -321,6 +321,12 @@ export function SaleFormDrawer({
             <span>Laba order</span>
             <span className="num gold">{rp(profit)}</span>
           </div>
+        </div>
+
+        <div className="text-[11.5px] mt-2" style={{ color: "var(--wa)" }}>
+          Invoice diajukan ke Owner untuk approval — transaksi, pengurangan stok,
+          dan pembayaran baru tercatat setelah disetujui. Rincian laba tiap jenis
+          barang tampil di halaman Approval.
         </div>
       </Drawer>
 

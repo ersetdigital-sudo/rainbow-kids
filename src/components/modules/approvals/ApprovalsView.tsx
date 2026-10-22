@@ -41,6 +41,11 @@ export function ApprovalsView() {
       const s = db.sales.find((x) => x.id === a.saleId);
       return s ? `${s.id} · ${s.customer}` : (a.saleId ?? "-");
     }
+    if (a.kind === "invoice") {
+      const s = db.sales.find((x) => x.id === a.saleId);
+      if (s) return `${s.id} · ${s.customer}`;
+      return `Invoice baru · ${a.saleRequest?.customer ?? "-"}`;
+    }
     if (a.kind === "nota") {
       const p = db.purchases.find((x) => x.id === a.purchaseId);
       return p ? `Nota ${p.nota} · ${p.supplier}` : (a.purchaseId ?? "-");
@@ -69,7 +74,7 @@ export function ApprovalsView() {
       label: "Sebelum",
       render: (a) => (
         <span style={{ color: "var(--mu)" }}>
-          <s>{fmt(a, a.before)}</s>
+          {a.kind === "invoice" ? "—" : <s>{fmt(a, a.before)}</s>}
         </span>
       ),
     },
@@ -100,7 +105,9 @@ export function ApprovalsView() {
       align: "right",
       render: (a) => (
         <div className="flex gap-1 justify-end">
-          {(a.kind === "nota" || a.kind === "sale") && (
+          {(a.kind === "nota" ||
+            a.kind === "sale" ||
+            a.kind === "invoice") && (
             <button
               type="button"
               className="btn s"
@@ -130,15 +137,17 @@ export function ApprovalsView() {
                 onClick={() => {
                   decideApproval(a.id, true);
                   toast(
-                    a.kind === "payment"
-                      ? "Pelunasan disetujui — invoice menjadi Lunas"
-                      : a.kind === "purchase"
-                        ? "Status pembelian disetujui menjadi Lunas"
-                        : a.kind === "nota"
-                          ? "Nota disetujui — harga beli diperbarui"
-                          : a.kind === "sale"
-                            ? "Harga & biaya invoice disetujui"
-                            : "Perubahan disetujui & diterapkan",
+                    a.kind === "invoice"
+                      ? "Invoice disetujui — transaksi tercatat & stok berkurang"
+                      : a.kind === "payment"
+                        ? "Pelunasan disetujui — invoice menjadi Lunas"
+                        : a.kind === "purchase"
+                          ? "Status pembelian disetujui menjadi Lunas"
+                          : a.kind === "nota"
+                            ? "Nota disetujui — harga beli diperbarui"
+                            : a.kind === "sale"
+                              ? "Harga & biaya invoice disetujui"
+                              : "Perubahan disetujui & diterapkan",
                   );
                 }}
               >
@@ -155,7 +164,7 @@ export function ApprovalsView() {
     <>
       <PageHead
         title="Approval & Audit Log"
-        subtitle="Izin belanja satu nota supplier, harga & biaya invoice, pelunasan, dan perubahan data varian — lengkap sebelum & sesudah."
+        subtitle="Invoice penjualan baru, izin belanja nota supplier, harga & biaya invoice, pelunasan, dan perubahan data varian — lengkap sebelum & sesudah, termasuk laba setiap barang."
       />
 
       <div className="tabs mb-4">

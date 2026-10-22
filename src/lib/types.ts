@@ -118,7 +118,22 @@ export type ApprovalKind =
   | "payment"
   | "purchase"
   | "sale"
-  | "nota";
+  | "nota"
+  | "invoice";
+
+/** Usulan invoice penjualan baru — baru tercatat setelah disetujui Owner. */
+export type SaleRequest = {
+  customer: string;
+  customerId?: string;
+  date: string;
+  type: SaleType;
+  due: string | null;
+  items: SaleItem[];
+  ship: number;
+  pack: number;
+  other: number;
+  paid: number;
+};
 
 /** Usulan perubahan harga jual / biaya sebuah invoice. */
 export type SaleRevision = {
@@ -152,6 +167,8 @@ export type Approval = {
   purchaseId?: string;
   /** Rincian usulan untuk kind "sale". */
   revision?: SaleRevision;
+  /** Rincian invoice baru untuk kind "invoice". */
+  saleRequest?: SaleRequest;
   /** Perubahan harga beli untuk kind "nota". */
   costChanges?: CostChange[];
   user: string;

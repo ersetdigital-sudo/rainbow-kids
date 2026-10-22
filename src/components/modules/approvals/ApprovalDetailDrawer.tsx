@@ -23,6 +23,173 @@ export function ApprovalDetailDrawer({
 
   if (!a) return null;
 
+  /* ---------------- Invoice penjualan baru ---------------- */
+  if (a.kind === "invoice") {
+    const req = a.saleRequest;
+    if (!req) return null;
+    const total = req.items.reduce((x, i) => x + i.qty * i.price, 0);
+    const modal = req.items.reduce((x, i) => x + i.qty * i.cost, 0);
+    const ops = (+req.ship || 0) + (+req.pack || 0) + (+req.other || 0);
+    const profit = total - modal - ops;
+
+    return (
+      <Drawer
+        open={Boolean(approvalId)}
+        onClose={onClose}
+        title="Detail invoice baru"
+        footer={
+          <button type="button" className="btn" onClick={onClose}>
+            Tutup
+          </button>
+        }
+      >
+        <div className="sdtop">
+          <div>
+            <div className="text-xs" style={{ color: "var(--mu)" }}>
+              {a.saleId ?? "Invoice baru"} · {formatDate(req.date)}
+            </div>
+            <div className="font-extrabold text-lg" style={{ color: "var(--nv)" }}>
+              {req.customer}
+            </div>
+          </div>
+          <Badge tone={a.status}>{a.status}</Badge>
+        </div>
+
+        <div className="sdc">
+          <div className="sdh">
+            <span className="sdi">🛍️</span>
+            <span>Barang &amp; laba per unit</span>
+            <span className="ml-auto font-semibold" style={{ color: "var(--nv)" }}>
+              {req.items.length} jenis
+            </span>
+          </div>
+
+          {req.items.map((i) => (
+            <div
+              key={i.vid}
+              className="flex justify-between gap-3 py-2 border-b"
+              style={{ borderColor: "var(--ln)" }}
+            >
+              <div className="min-w-0">
+                <div className="font-semibold text-[13.5px]" style={{ color: "var(--nv)" }}>
+                  {variantLabel(db, i.vid)}
+                </div>
+                <div className="text-[12px]" style={{ color: "var(--mu)" }}>
+                  {i.qty} unit × {rp(i.price)} · modal {rp(i.cost)}/unit
+                </div>
+                <div
+                  className="text-[12px]"
+                  style={{
+                    color: itemProfit(i) >= 0 ? "var(--ok)" : "var(--er)",
+                  }}
+                >
+                  laba {rp(itemProfit(i))}/unit · total baris{" "}
+                  {rp(itemProfit(i) * i.qty)}
+                </div>
+              </div>
+              <div className="text-right whitespace-nowrap">
+                <div className="num font-semibold" style={{ color: "var(--nv)" }}>
+                  {rp(i.qty * i.price)}
+                </div>
+              </div>
+            </div>
+          ))}
+
+          <div className="sdtot">
+            <span>Total penjualan</span>
+            <span className="num">{rp(total)}</span>
+          </div>
+        </div>
+
+        <div className="sdc">
+          <div className="sdh">
+            <span className="sdi">🚚</span>
+            <span>Biaya operasional</span>
+          </div>
+          <div className="flex justify-between py-1.5 text-[13px]">
+            <span style={{ color: "var(--mu)" }}>Ekspedisi / ongkir</span>
+            <span className="num">{rp(req.ship)}</span>
+          </div>
+          <div className="flex justify-between py-1.5 text-[13px]">
+            <span style={{ color: "var(--mu)" }}>Packing</span>
+            <span className="num">{rp(req.pack)}</span>
+          </div>
+          <div className="flex justify-between py-1.5 text-[13px]">
+            <span style={{ color: "var(--mu)" }}>Biaya lain</span>
+            <span className="num">{rp(req.other)}</span>
+          </div>
+        </div>
+
+        <div className="sdc">
+          <div className="sdh">
+            <span className="sdi">↗</span>
+            <span>Catatan laba</span>
+          </div>
+          <div className="text-[12.5px] space-y-1" style={{ color: "var(--mu)" }}>
+            <p>
+              Laba dihitung <b>per unit tiap jenis barang</b> (harga jual − modal),
+              sebelum ongkir/packing. Barang dengan laba minus sudah ditandai merah
+              di atas.
+            </p>
+            <p>
+              Modal hanya tampil di layar internal ini dan tidak pernah dicetak pada
+              invoice pelanggan.
+            </p>
+          </div>
+          <div className="mt-2 pt-2 border-t text-[13px]" style={{ borderColor: "var(--ln)" }}>
+            <div className="flex justify-between py-1">
+              <span style={{ color: "var(--mu)" }}>Total penjualan</span>
+              <span className="num">{rp(total)}</span>
+            </div>
+            <div className="flex justify-between py-1">
+              <span style={{ color: "var(--mu)" }}>− Modal barang</span>
+              <span className="num">{rp(modal)}</span>
+            </div>
+            <div className="flex justify-between py-1">
+              <span style={{ color: "var(--mu)" }}>− Biaya operasional</span>
+              <span className="num">{rp(ops)}</span>
+            </div>
+            <div className="flex justify-between py-1">
+              <span className="font-semibold">Laba order</span>
+              <b className="num" style={{ color: profit >= 0 ? "var(--ok)" : "var(--er)" }}>
+                {rp(profit)}
+              </b>
+            </div>
+          </div>
+        </div>
+
+        <div className="text-[13px] px-1">
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>Jenis pembayaran</span>
+            <b style={{ color: "var(--nv)" }}>
+              {req.type === "tempo"
+                ? `Tempo · jatuh tempo ${formatDate(req.due)}`
+                : "Tunai (lunas otomatis)"}
+            </b>
+          </div>
+          {req.type === "tempo" && (
+            <div className="flex justify-between py-1.5">
+              <span style={{ color: "var(--mu)" }}>Uang muka</span>
+              <b style={{ color: "var(--nv)" }}>{rp(req.paid)}</b>
+            </div>
+          )}
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>Diajukan</span>
+            <b style={{ color: "var(--nv)" }}>{a.user}</b>
+          </div>
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>Waktu</span>
+            <b style={{ color: "var(--nv)" }}>{a.time}</b>
+          </div>
+          <div className="text-[11.5px] mt-1" style={{ color: "var(--wa)" }}>
+            Transaksi, pengurangan stok, dan pembayaran baru tercatat setelah
+            Owner menyetujui pengajuan ini.
+          </div>
+        </div>
+      </Drawer>
+    );
+  }
+
   /* ---------------- Nota belanja supplier ---------------- */
   if (a.kind === "nota") {
     const p = db.purchases.find((x) => x.id === a.purchaseId);
