@@ -1083,6 +1083,251 @@ table.t {
   }
 }
 
+/* ---------------- Piutang & Pembayaran ---------------- */
+.ar-hero {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  gap: 20px;
+  padding: 22px;
+  border-radius: 20px;
+  color: #fff;
+  background:
+    radial-gradient(
+      90% 120% at 100% 0%,
+      rgba(254, 196, 11, 0.24) 0%,
+      rgba(254, 196, 11, 0) 55%
+    ),
+    linear-gradient(135deg, #04123f 0%, #0b1f5c 55%, #14306c 100%);
+  box-shadow: 0 18px 40px -28px rgba(4, 18, 63, 0.85);
+}
+.ar-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+}
+.ar-total {
+  font-size: clamp(28px, 4.6vw, 38px);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.12;
+  margin-top: 6px;
+}
+.ar-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.ar-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.86);
+}
+.ar-progress {
+  margin-top: 16px;
+  max-width: 340px;
+}
+.ar-progress-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.66);
+  margin-bottom: 6px;
+}
+.ar-progress-track {
+  height: 8px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+.ar-progress-track > span {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #fec40b, #ffd75e);
+  transition: width 0.4s ease;
+}
+.ar-legend {
+  display: grid;
+  gap: 6px;
+}
+.ar-legend-item {
+  display: grid;
+  grid-template-columns: 8px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 14px;
+  text-align: left;
+  color: #fff;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease;
+}
+.ar-legend-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.ar-legend-item.on {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(254, 196, 11, 0.7);
+}
+.ar-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dc);
+}
+.ar-legend-body {
+  min-width: 0;
+}
+.ar-legend-label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+.ar-legend-bar {
+  display: block;
+  height: 4px;
+  margin-top: 5px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+.ar-legend-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--dc);
+}
+.ar-legend-num {
+  text-align: right;
+}
+.ar-legend-num > span:first-child {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+}
+.ar-legend-count {
+  display: block;
+  margin-top: 2px;
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.ar-listhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 16px 16px 12px;
+}
+.ar-note {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--wa);
+  background: var(--wab);
+  padding: 4px 10px;
+  border-radius: 99px;
+}
+.ar-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 0 16px 14px;
+  border-bottom: 1px solid var(--ln);
+}
+.ar-search {
+  position: relative;
+  flex: 1 1 240px;
+  max-width: 320px;
+}
+.ar-search svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--mu);
+  pointer-events: none;
+}
+.ar-search input {
+  padding-left: 34px !important;
+}
+.ar-dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ar-dates label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--mu);
+}
+.ar-pills {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--ln);
+}
+.ar-pills button {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 99px;
+  border: 1px solid transparent;
+  background: #f2f5fa;
+  color: var(--mu);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ar-pills button:hover {
+  background: #e9eef7;
+  color: var(--nv);
+}
+.ar-pills button.on {
+  background: var(--nv);
+  border-color: var(--nv);
+  color: #fff;
+}
+.ar-pills button b {
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.7;
+}
+
+@media (min-width: 768px) {
+  .ar-hero {
+    grid-template-columns: 1.05fr 1fr;
+    align-items: center;
+    padding: 24px 26px;
+  }
+}
+
 /* ---------------- Print helper ---------------- */
 @media print {
   .no-print {

@@ -70,14 +70,15 @@ export function PurchaseFormDrawer({
               Batal
             </button>
             <button type="button" className="btn p" onClick={submit}>
-              Konfirmasi &amp; masukkan stok
+              Ajukan nota belanja
             </button>
           </>
         }
       >
         <div className="sim mb-4">
-          Tip: salin isi nota/struk baris per baris. Menyimpan mencatat
-          pembelian dan langsung menambah stok barang.
+          Tip: salin isi nota/struk baris per baris. Menyimpan mengajukan nota ke
+          Owner — pembelian, tambahan stok, dan harga modal baru tercatat setelah
+          disetujui.
         </div>
 
         <div className="grid sm:grid-cols-3 gap-3">
@@ -220,11 +221,11 @@ export function PurchaseFormDrawer({
           {diff.length > 0 && (
             <div className="text-xs mt-2 gold">
               {diff.length} barang punya harga satuan berbeda dari harga modal saat
-              ini. Perubahan harga modal akan diajukan ke approval.
+              ini. Perubahan harga modal ikut diajukan dalam approval nota ini.
             </div>
           )}
           <div className="text-xs mt-2 muted">
-            Status pembayaran awal: <b>Belum Lunas</b>. Penandaan lunas
+            Status pembayaran awal: <b>Belum Lunas</b>. Penandaan lunas juga
             memerlukan approval Owner.
           </div>
         </div>

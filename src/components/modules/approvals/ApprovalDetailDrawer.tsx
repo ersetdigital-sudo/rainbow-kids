@@ -2,7 +2,7 @@
 
 import { formatDate } from "@/lib/date";
 import { rp } from "@/lib/format";
-import { itemProfit, purchaseTotal, variantLabel } from "@/lib/calc";
+import { itemProfit, variantLabel } from "@/lib/calc";
 import { useStore } from "@/lib/store";
 import { Badge } from "@/components/ui/Badge";
 import { Drawer } from "@/components/ui/Drawer";
@@ -193,6 +193,13 @@ export function ApprovalDetailDrawer({
   /* ---------------- Nota belanja supplier ---------------- */
   if (a.kind === "nota") {
     const p = db.purchases.find((x) => x.id === a.purchaseId);
+    const req = a.purchaseRequest;
+    // Nota baru belum punya record pembelian — pakai rincian pengajuannya.
+    const items = req?.items ?? p?.items ?? [];
+    const nota = req?.nota ?? p?.nota;
+    const supplier = req?.supplier ?? p?.supplier ?? "-";
+    const date = req?.date ?? p?.date;
+    const total = items.reduce((x, i) => x + i.qty * i.cost, 0);
     return (
       <Drawer
         open={Boolean(approvalId)}
@@ -207,10 +214,10 @@ export function ApprovalDetailDrawer({
         <div className="sdtop">
           <div>
             <div className="text-xs" style={{ color: "var(--mu)" }}>
-              {p ? `Nota ${p.nota}` : "Nota"}
+              {nota ? `Nota ${nota}` : "Nota"}
             </div>
             <div className="font-extrabold text-lg" style={{ color: "var(--nv)" }}>
-              {p?.supplier ?? a.purchaseId}
+              {supplier}
             </div>
           </div>
           <Badge tone={a.status}>{a.status}</Badge>
@@ -221,11 +228,11 @@ export function ApprovalDetailDrawer({
             <span className="sdi">🧾</span>
             <span>Barang yang dibelanjakan</span>
             <span className="ml-auto font-semibold" style={{ color: "var(--nv)" }}>
-              {p?.items.length ?? 0} jenis
+              {items.length} jenis
             </span>
           </div>
 
-          {p?.items.map((i) => {
+          {items.map((i) => {
             const change = (a.costChanges ?? []).find((c) => c.vid === i.vid);
             const before = change ? change.before : i.cost;
             const delta = i.cost - before;
@@ -265,10 +272,10 @@ export function ApprovalDetailDrawer({
             );
           })}
 
-          {p && (
+          {items.length > 0 && (
             <div className="sdtot">
               <span>Total nota</span>
-              <span className="num">{rp(purchaseTotal(p))}</span>
+              <span className="num">{rp(total)}</span>
             </div>
           )}
         </div>
@@ -276,7 +283,7 @@ export function ApprovalDetailDrawer({
         <div className="text-[13px] px-1">
           <div className="flex justify-between py-1.5">
             <span style={{ color: "var(--mu)" }}>Tanggal nota</span>
-            <b style={{ color: "var(--nv)" }}>{formatDate(p?.date)}</b>
+            <b style={{ color: "var(--nv)" }}>{formatDate(date)}</b>
           </div>
           <div className="flex justify-between py-1.5">
             <span style={{ color: "var(--mu)" }}>Total harga sebelumnya</span>
@@ -286,6 +293,12 @@ export function ApprovalDetailDrawer({
             <span style={{ color: "var(--mu)" }}>Diajukan</span>
             <b style={{ color: "var(--nv)" }}>{a.user}</b>
           </div>
+          {req && (
+            <div className="text-[11.5px] mt-1" style={{ color: "var(--wa)" }}>
+              Nota ini belum tercatat — pembelian, tambahan stok, dan harga modal
+              baru berlaku setelah Owner menyetujui.
+            </div>
+          )}
         </div>
       </Drawer>
     );

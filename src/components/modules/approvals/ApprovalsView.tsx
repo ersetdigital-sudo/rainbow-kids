@@ -48,7 +48,10 @@ export function ApprovalsView() {
     }
     if (a.kind === "nota") {
       const p = db.purchases.find((x) => x.id === a.purchaseId);
-      return p ? `Nota ${p.nota} · ${p.supplier}` : (a.purchaseId ?? "-");
+      if (p) return `Nota ${p.nota} · ${p.supplier}`;
+      if (a.purchaseRequest)
+        return `Nota baru ${a.purchaseRequest.nota} · ${a.purchaseRequest.supplier}`;
+      return a.purchaseId ?? "-";
     }
     return variantLabel(db, a.vid ?? "");
   };

@@ -143,6 +143,14 @@ export type SaleRevision = {
   other: number;
 };
 
+/** Usulan nota belanja supplier — baru tercatat setelah disetujui Owner. */
+export type PurchaseRequest = {
+  supplier: string;
+  nota: string;
+  date: string;
+  items: PurchaseItem[];
+};
+
 /** Selisih harga beli sebuah barang pada nota pembelian. */
 export type CostChange = {
   vid: string;
@@ -171,6 +179,8 @@ export type Approval = {
   saleRequest?: SaleRequest;
   /** Perubahan harga beli untuk kind "nota". */
   costChanges?: CostChange[];
+  /** Rincian nota baru untuk kind "nota" (izin belanja). */
+  purchaseRequest?: PurchaseRequest;
   user: string;
   time: string;
   status: "Menunggu" | "Disetujui" | "Ditolak";

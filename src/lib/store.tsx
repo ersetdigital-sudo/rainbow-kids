@@ -26,6 +26,7 @@ import type {
   DB,
   ModuleKey,
   OpnameLine,
+  PurchaseRequest,
   Role,
   Sale,
   SaleItem,
@@ -451,82 +452,62 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   /* ---------------- Pembelian supplier ---------------- */
 
+  /**
+   * Nota belanja supplier tidak langsung tercatat — diajukan ke Owner.
+   * Pembelian, tambahan stok, dan harga modal baru berlaku setelah disetujui.
+   */
   const savePurchase = useCallback<StoreValue["savePurchase"]>(
     (draft) => {
       const current = getSnapshot();
       if (!draft.supplier.trim() || !draft.nota.trim())
         return { ok: false, msg: "Isi supplier dan no. nota" };
-      const id = `PB-${String(current.purchases.length + 1).padStart(3, "0")}`;
+      if (!draft.items.length)
+        return { ok: false, msg: "Tambahkan minimal satu barang" };
       const time = `${TODAY} ${new Date().toTimeString().slice(0, 5)}`;
 
-      setSnapshot((prev) => {
-        // Satu nota belanja = satu pengajuan approval (bukan per barang).
-        const costChanges: CostChange[] = [];
-        let beforeTotal = 0;
-        for (const item of draft.items) {
-          const variant = prev.products
-            .flatMap((p) => p.variants)
-            .find((v) => v.id === item.vid);
-          beforeTotal += item.qty * (variant?.cost ?? item.cost);
-          if (variant && variant.cost !== item.cost)
-            costChanges.push({
-              vid: item.vid,
-              before: variant.cost,
-              after: item.cost,
-            });
-        }
-        const approvals = [
+      // Satu nota belanja = satu pengajuan approval (bukan per barang).
+      const costChanges: CostChange[] = [];
+      let beforeTotal = 0;
+      for (const item of draft.items) {
+        const variant = current.products
+          .flatMap((p) => p.variants)
+          .find((v) => v.id === item.vid);
+        beforeTotal += item.qty * (variant?.cost ?? item.cost);
+        if (variant && variant.cost !== item.cost)
+          costChanges.push({
+            vid: item.vid,
+            before: variant.cost,
+            after: item.cost,
+          });
+      }
+      const request: PurchaseRequest = {
+        supplier: draft.supplier.trim(),
+        nota: draft.nota.trim(),
+        date: draft.date,
+        items: draft.items.map((i) => ({ ...i })),
+      };
+
+      setSnapshot((prev) => ({
+        ...prev,
+        approvals: [
           ...prev.approvals,
           {
             id: `AP-${String(prev.approvals.length + 1).padStart(3, "0")}`,
             kind: "nota" as const,
             type: "Izin belanja nota",
-            purchaseId: id,
             before: beforeTotal,
-            after: draft.items.reduce((a, i) => a + i.qty * i.cost, 0),
+            after: request.items.reduce((a, i) => a + i.qty * i.cost, 0),
             costChanges,
+            purchaseRequest: request,
             user: prev.user,
             time,
             status: "Menunggu" as const,
-            ref: id,
           },
-        ];
-        return {
-          ...prev,
-          approvals,
-          purchases: [
-            ...prev.purchases,
-            {
-              id,
-              nota: draft.nota.trim(),
-              supplier: draft.supplier.trim(),
-              date: draft.date,
-              items: draft.items.map((i) => ({ ...i })),
-              payStatus: "Belum Lunas" as const,
-            },
-          ],
-          products: prev.products.map((p) => ({
-            ...p,
-            variants: p.variants.map((v) => {
-              const item = draft.items.find((i) => i.vid === v.id);
-              return item ? { ...v, stock: v.stock + item.qty } : v;
-            }),
-          })),
-          history: [
-            ...prev.history,
-            ...draft.items.map((i) => ({
-              vid: i.vid,
-              date: draft.date,
-              type: "Stok" as const,
-              desc: `Pembelian ${id} (${draft.nota}) +${i.qty}`,
-              user: prev.user,
-            })),
-          ],
-        };
-      });
+        ],
+      }));
       return {
         ok: true,
-        msg: `Pembelian ${id} tersimpan, stok bertambah`,
+        msg: "Nota belanja diajukan — menunggu approval Owner",
       };
     },
     [],
@@ -814,9 +795,84 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
-      // 4. Izin belanja satu nota supplier (sekaligus harga beli baru)
+      // 4. Izin belanja satu nota supplier (nota baru + harga beli baru)
       if (a.kind === "nota") {
         const history = [...prev.history];
+        const req = a.purchaseRequest;
+
+        // 4a. Nota baru — pembelian & tambahan stok baru tercatat setelah disetujui.
+        if (req) {
+          if (!ok)
+            return {
+              ...prev,
+              approvals: prev.approvals.map((x) =>
+                x.id === id
+                  ? { ...x, status: "Ditolak" as const, by: prev.user }
+                  : x,
+              ),
+            };
+
+          const purchaseId = `PB-${String(prev.purchases.length + 1).padStart(3, "0")}`;
+          const products = prev.products.map((p) => ({
+            ...p,
+            variants: p.variants.map((v) => {
+              const item = req.items.find((i) => i.vid === v.id);
+              const change = (a.costChanges ?? []).find((c) => c.vid === v.id);
+              if (!item && !change) return v;
+              if (change)
+                history.push({
+                  vid: v.id,
+                  date: TODAY,
+                  type: "Harga" as const,
+                  desc: `Harga modal (nota ${req.nota}): Rp ${Number(change.before).toLocaleString("id-ID")} → Rp ${Number(change.after).toLocaleString("id-ID")}`,
+                  user: prev.user,
+                });
+              return {
+                ...v,
+                stock: item ? v.stock + item.qty : v.stock,
+                cost: change ? change.after : v.cost,
+              };
+            }),
+          }));
+
+          return {
+            ...prev,
+            products,
+            purchases: [
+              ...prev.purchases,
+              {
+                id: purchaseId,
+                nota: req.nota,
+                supplier: req.supplier,
+                date: req.date,
+                items: req.items.map((i) => ({ ...i })),
+                payStatus: "Belum Lunas" as const,
+              },
+            ],
+            history: [
+              ...history,
+              ...req.items.map((i) => ({
+                vid: i.vid,
+                date: req.date,
+                type: "Stok" as const,
+                desc: `Pembelian ${purchaseId} (${req.nota}) +${i.qty}`,
+                user: prev.user,
+              })),
+            ],
+            approvals: prev.approvals.map((x) =>
+              x.id === id
+                ? {
+                    ...x,
+                    status: "Disetujui" as const,
+                    by: prev.user,
+                    purchaseId,
+                  }
+                : x,
+            ),
+          };
+        }
+
+        // 4b. Nota lama — hanya harga beli yang diperbarui.
         const products = ok
           ? prev.products.map((p) => ({
               ...p,

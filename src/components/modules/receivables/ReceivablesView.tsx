@@ -1,15 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { formatDate } from "@/lib/date";
+import { formatDate, TODAY } from "@/lib/date";
 import { rp } from "@/lib/format";
 import { downloadCsv, stamp } from "@/lib/export";
-import {
-  arStatus,
-  salePaid,
-  saleProfit,
-  saleTotal,
-} from "@/lib/calc";
+import { arStatus, salePaid, saleProfit, saleTotal } from "@/lib/calc";
 import { useStore } from "@/lib/store";
 import { Badge } from "@/components/ui/Badge";
 import { DataTable, type Column } from "@/components/ui/DataTable";
@@ -25,6 +20,20 @@ const STATUSES: (ArStatus | "")[] = [
   "Menunggu Pelunasan",
   "Lunas",
 ];
+
+/** Legenda ringkasan tagihan: tiga status berjalan + lunas. */
+const LEGEND: { st: ArStatus; color: string }[] = [
+  { st: "Belum jatuh tempo", color: "#FEC40B" },
+  { st: "Jatuh tempo", color: "#F59E0B" },
+  { st: "Terlambat", color: "#EF4444" },
+  { st: "Lunas", color: "#22C55E" },
+];
+
+const dayDiff = (date: string) =>
+  Math.round(
+    (new Date(`${TODAY}T00:00`).getTime() - new Date(`${date}T00:00`).getTime()) /
+      86400000,
+  );
 
 export function ReceivablesView() {
   const { db, toast } = useStore();
@@ -63,13 +72,6 @@ export function ReceivablesView() {
   const remaining = (rows: Sale[]) =>
     rows.reduce((x, s) => x + saleTotal(s) - salePaid(s), 0);
 
-  const cards: { st: ArStatus; label: string }[] = [
-    { st: "Belum jatuh tempo", label: "Belum jatuh tempo" },
-    { st: "Jatuh tempo", label: "Jatuh tempo (≤3 hari)" },
-    { st: "Terlambat", label: "Terlambat" },
-    { st: "Lunas", label: "Lunas" },
-  ];
-
   /** Tagihan yang masih berjalan (belum lunas) untuk ringkasan total. */
   const openStatuses: ArStatus[] = [
     "Belum jatuh tempo",
@@ -78,6 +80,15 @@ export function ReceivablesView() {
   ];
   const openRows = tempoSales.filter((s) => openStatuses.includes(arStatus(s)));
   const totalOpen = remaining(openRows);
+
+  const totalTempo = tempoSales.reduce((x, s) => x + saleTotal(s), 0);
+  const collected = tempoSales.reduce((x, s) => x + salePaid(s), 0);
+  const pctCollected = totalTempo ? Math.round((collected / totalTempo) * 100) : 0;
+
+  const legendValue = (st: ArStatus) =>
+    st === "Lunas"
+      ? byStatus(st).reduce((x, s) => x + saleTotal(s), 0)
+      : remaining(byStatus(st));
 
   const exportRows = () => {
     downloadCsv(
@@ -124,9 +135,40 @@ export function ReceivablesView() {
         </span>
       ),
     },
-    { key: "customer", label: "Pelanggan", render: (s) => s.customer },
-    { key: "date", label: "Tanggal", render: (s) => formatDate(s.date) },
-    { key: "due", label: "Jatuh tempo", render: (s) => formatDate(s.due) },
+    {
+      key: "customer",
+      label: "Pelanggan",
+      render: (s) => (
+        <div>
+          <div className="font-medium">{s.customer}</div>
+          <div className="text-[11px]" style={{ color: "var(--mu)" }}>
+            Order {formatDate(s.date)}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "due",
+      label: "Jatuh tempo",
+      render: (s) => {
+        const late = s.due ? dayDiff(s.due) : 0;
+        return (
+          <div>
+            <div>{formatDate(s.due)}</div>
+            {late > 0 && arStatus(s) !== "Lunas" && (
+              <div className="text-[11px] font-semibold" style={{ color: "var(--er)" }}>
+                lewat {late} hari
+              </div>
+            )}
+            {late <= 0 && late >= -3 && arStatus(s) !== "Lunas" && (
+              <div className="text-[11px] font-semibold" style={{ color: "var(--wa)" }}>
+                ≤ {Math.abs(late)} hari lagi
+              </div>
+            )}
+          </div>
+        );
+      },
+    },
     {
       key: "total",
       label: "Total",
@@ -189,7 +231,7 @@ export function ReceivablesView() {
     <>
       <PageHead
         title="Piutang & Pembayaran"
-        subtitle="Pantau tagihan tempo pelanggan dan catat pembayaran sebagian. Pelunasan butuh approval Owner."
+        subtitle="Pantau tagihan tempo, catat pembayaran sebagian, dan ajukan pelunasan ke Owner."
         actions={
           <button
             type="button"
@@ -202,110 +244,121 @@ export function ReceivablesView() {
         }
       />
 
-      <div className="card p-4 flex flex-wrap items-center gap-x-8 gap-y-3">
+      {/* Ringkasan tagihan */}
+      <section className="ar-hero">
         <div>
-          <div className="text-[12.5px]" style={{ color: "var(--mu)" }}>
-            Total tagihan
+          <div className="ar-kicker">Total tagihan berjalan</div>
+          <div className="ar-total num">{rp(totalOpen)}</div>
+          <div className="ar-chips">
+            <span className="ar-chip">{openRows.length} invoice terbuka</span>
+            <span className="ar-chip">
+              {byStatus("Terlambat").length} terlambat
+            </span>
+            <span className="ar-chip">{rp(collected)} sudah tertagih</span>
           </div>
-          <div
-            className="num"
-            style={{
-              fontSize: 26,
-              fontWeight: 800,
-              color: "var(--nv)",
-              lineHeight: 1.2,
-            }}
-          >
-            {rp(totalOpen)}
-          </div>
-          <div className="text-xs" style={{ color: "var(--mu)" }}>
-            {openRows.length} tagihan belum lunas
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-x-8 gap-y-2">
-          {openStatuses.map((st) => (
-            <div key={st}>
-              <div
-                className="text-[11.5px] uppercase tracking-wide"
-                style={{ color: "var(--mu)" }}
-              >
-                {st}
-              </div>
-              <div className="num font-semibold" style={{ color: "var(--nv)" }}>
-                {rp(remaining(byStatus(st)))}
-              </div>
-              <div className="text-[11px]" style={{ color: "var(--mu)" }}>
-                {byStatus(st).length} tagihan
-              </div>
+          <div className="ar-progress">
+            <div className="ar-progress-head">
+              <span>Progress penagihan</span>
+              <span className="num">{pctCollected}%</span>
             </div>
-          ))}
+            <div className="ar-progress-track">
+              <span style={{ width: `${pctCollected}%` }} />
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
-        {cards.map((c) => {
-          const rows = byStatus(c.st);
-          const value =
-            c.st === "Lunas"
-              ? rows.reduce((x, s) => x + saleTotal(s), 0)
-              : remaining(rows);
-          return (
-            <button
-              key={c.st}
-              type="button"
-              onClick={() => setFilter(filter === c.st ? "" : c.st)}
-              className="card kpi p-4 text-left"
-              style={
-                filter === c.st
-                  ? { boxShadow: "0 0 0 2px #C99300" }
-                  : undefined
-              }
-            >
-              <div className="l">{c.label}</div>
-              <div className="v num">{rp(value)}</div>
-              <div className="text-xs mt-1" style={{ color: "var(--mu)" }}>
-                {rows.length} tagihan
-              </div>
-            </button>
-          );
-        })}
-      </div>
+        <div className="ar-legend">
+          {LEGEND.map((l) => {
+            const rows = byStatus(l.st);
+            const value = legendValue(l.st);
+            const share =
+              l.st === "Lunas" || totalOpen <= 0
+                ? 0
+                : Math.min((value / totalOpen) * 100, 100);
+            const on = filter === l.st;
+            return (
+              <button
+                key={l.st}
+                type="button"
+                aria-pressed={on}
+                onClick={() => setFilter(on ? "" : l.st)}
+                className={`ar-legend-item${on ? " on" : ""}`}
+                style={{ ["--dc" as string]: l.color }}
+              >
+                <span className="ar-legend-dot" aria-hidden="true" />
+                <span className="ar-legend-body">
+                  <span className="ar-legend-label">{l.st}</span>
+                  <span className="ar-legend-bar" aria-hidden="true">
+                    <span style={{ width: `${share}%` }} />
+                  </span>
+                </span>
+                <span className="ar-legend-num">
+                  <span className="num">{rp(value)}</span>
+                  <span className="ar-legend-count">{rows.length} tagihan</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
+      {/* Daftar tagihan */}
       <div className="card mt-4">
-        <div className="flex flex-wrap gap-2 p-4 items-end">
-          <div className="min-w-[220px] flex-1 max-w-xs">
-            <label className="f">Cari</label>
+        <div className="ar-listhead">
+          <div>
+            <div className="font-bold" style={{ color: "var(--nv)" }}>
+              Daftar tagihan tempo
+            </div>
+            <div className="text-xs" style={{ color: "var(--mu)" }}>
+              {list.length} dari {tempoSales.length} invoice tempo
+            </div>
+          </div>
+          <span className="ar-note">Pelunasan butuh approval Owner</span>
+        </div>
+
+        <div className="ar-toolbar">
+          <div className="ar-search">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              aria-hidden="true"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
+            </svg>
             <input
-              placeholder="No. invoice / nama pelanggan"
+              placeholder="Cari no. invoice / nama pelanggan"
+              aria-label="Cari tagihan"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
           </div>
-          <div>
-            <label className="f">Status</label>
-            <select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value as ArStatus | "")}
-            >
-              <option value="">Semua</option>
-              {STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="f">Dari tanggal</label>
-            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-          </div>
-          <div>
-            <label className="f">Sampai</label>
-            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          <div className="ar-dates">
+            <label>
+              Dari tanggal
+              <input
+                type="date"
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+              />
+            </label>
+            <label>
+              Sampai
+              <input
+                type="date"
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+              />
+            </label>
           </div>
           <button
             type="button"
-            className="btn"
+            className="btn s"
             onClick={() => {
               setFilter("");
               setFrom("");
@@ -316,6 +369,27 @@ export function ReceivablesView() {
             Reset
           </button>
         </div>
+
+        <div className="ar-pills">
+          <button
+            type="button"
+            className={filter === "" ? "on" : undefined}
+            onClick={() => setFilter("")}
+          >
+            Semua <b>{tempoSales.length}</b>
+          </button>
+          {STATUSES.map((st) => (
+            <button
+              key={st}
+              type="button"
+              className={filter === st ? "on" : undefined}
+              onClick={() => setFilter(st)}
+            >
+              {st} <b>{byStatus(st as ArStatus).length}</b>
+            </button>
+          ))}
+        </div>
+
         <DataTable
           columns={columns}
           rows={list}
