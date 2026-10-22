@@ -57,7 +57,8 @@ export function SalesView() {
       `penjualan-rainbow-kids-${stamp()}`,
       [
         "No. Invoice",
-        "Tanggal",
+        "Tanggal order",
+        "Jatuh tempo",
         "Pelanggan",
         "Jenis",
         "Total",
@@ -71,6 +72,7 @@ export function SalesView() {
       list.map((s) => [
         s.id,
         formatDate(s.date),
+        s.due ? formatDate(s.due) : "-",
         s.customer,
         s.type === "tempo" ? "Tempo" : "Tunai",
         rp(saleTotal(s)),
@@ -91,7 +93,12 @@ export function SalesView() {
       label: "No. Invoice",
       render: (s) => <span className="font-semibold">{s.id}</span>,
     },
-    { key: "date", label: "Tanggal", render: (s) => formatDate(s.date) },
+    { key: "date", label: "Tanggal order", render: (s) => formatDate(s.date) },
+    {
+      key: "due",
+      label: "Jatuh tempo",
+      render: (s) => (s.due ? formatDate(s.due) : "—"),
+    },
     { key: "customer", label: "Pelanggan", render: (s) => s.customer },
     {
       key: "type",

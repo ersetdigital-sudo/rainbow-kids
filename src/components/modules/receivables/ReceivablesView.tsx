@@ -67,9 +67,17 @@ export function ReceivablesView() {
     { st: "Belum jatuh tempo", label: "Belum jatuh tempo" },
     { st: "Jatuh tempo", label: "Jatuh tempo (≤3 hari)" },
     { st: "Terlambat", label: "Terlambat" },
-    { st: "Menunggu Pelunasan", label: "Menunggu approval" },
     { st: "Lunas", label: "Lunas" },
   ];
+
+  /** Tagihan yang masih berjalan (belum lunas) untuk ringkasan total. */
+  const openStatuses: ArStatus[] = [
+    "Belum jatuh tempo",
+    "Jatuh tempo",
+    "Terlambat",
+  ];
+  const openRows = tempoSales.filter((s) => openStatuses.includes(arStatus(s)));
+  const totalOpen = remaining(openRows);
 
   const exportRows = () => {
     downloadCsv(
@@ -194,7 +202,47 @@ export function ReceivablesView() {
         }
       />
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="card p-4 flex flex-wrap items-center gap-x-8 gap-y-3">
+        <div>
+          <div className="text-[12.5px]" style={{ color: "var(--mu)" }}>
+            Total tagihan
+          </div>
+          <div
+            className="num"
+            style={{
+              fontSize: 26,
+              fontWeight: 800,
+              color: "var(--nv)",
+              lineHeight: 1.2,
+            }}
+          >
+            {rp(totalOpen)}
+          </div>
+          <div className="text-xs" style={{ color: "var(--mu)" }}>
+            {openRows.length} tagihan belum lunas
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-x-8 gap-y-2">
+          {openStatuses.map((st) => (
+            <div key={st}>
+              <div
+                className="text-[11.5px] uppercase tracking-wide"
+                style={{ color: "var(--mu)" }}
+              >
+                {st}
+              </div>
+              <div className="num font-semibold" style={{ color: "var(--nv)" }}>
+                {rp(remaining(byStatus(st)))}
+              </div>
+              <div className="text-[11px]" style={{ color: "var(--mu)" }}>
+                {byStatus(st).length} tagihan
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
         {cards.map((c) => {
           const rows = byStatus(c.st);
           const value =

@@ -360,7 +360,7 @@ export function PurchaseDetailDrawer({
           const v = db.products
             .flatMap((x) => x.variants)
             .find((x) => x.id === i.vid);
-          const last = lastPurchaseOf(db, i.vid);
+          const last = lastPurchaseOf(db, i.vid, p.id);
           const delta = last ? i.cost - last.cost : 0;
           return (
             <div className="sdp" key={i.vid}>

@@ -6,6 +6,7 @@ import type {
   Product,
   Purchase,
   Sale,
+  SaleItem,
   Variant,
 } from "./types";
 
@@ -17,6 +18,9 @@ export const saleOps = (s: Sale) =>
   (+s.ship || 0) + (+s.pack || 0) + (+s.other || 0);
 export const saleTotal = (s: Sale) => saleSub(s);
 export const saleProfit = (s: Sale) => saleSub(s) - saleCost(s) - saleOps(s);
+
+/** Laba kotor per unit (harga jual − modal), sebelum biaya operasional. */
+export const itemProfit = (i: SaleItem) => i.price - i.cost;
 
 /** Pembayaran yang sudah berlaku (bukan pengajuan yang menunggu approval). */
 export const salePaid = (s: Sale) =>
@@ -34,7 +38,9 @@ export function arStatus(s: Sale, today = TODAY): ArStatus {
   const rem = saleTotal(s) - salePaid(s);
   if (rem <= 0) return "Lunas";
   if (saleProposed(s) >= rem) return "Menunggu Pelunasan";
-  if (!s.due) return "Lunas";
+  // Tanpa jatuh tempo (tunai) tapi masih ada sisa — mis. harga diubah lewat
+  // approval setelah pembayaran tunai tercatat.
+  if (!s.due) return "Belum jatuh tempo";
   if (s.due < today) return "Terlambat";
   if (s.due <= addDays(today, 3)) return "Jatuh tempo";
   return "Belum jatuh tempo";
@@ -99,22 +105,32 @@ export const LOW_STOCK = 15;
 
 /* ---------------- Harga jual ---------------- */
 
-export function priceRange(db: DB, vid: string) {
-  const v = findVariant(db, vid);
-  if (!v) return null;
-  return { min: v.product.minPrice, max: v.product.maxPrice };
-}
-
-export function inRange(db: DB, vid: string, price: number) {
-  const r = priceRange(db, vid);
-  if (!r) return true;
-  return price >= r.min && price <= r.max;
+/**
+ * Riwayat harga jual sebuah varian dari transaksi sebelumnya.
+ * Dipakai sebagai acuan saat mengisi harga jual — bukan pembatas.
+ */
+export function salePriceHistory(db: DB, vid: string) {
+  const rows = db.sales
+    .flatMap((s) =>
+      s.items
+        .filter((i) => i.vid === vid)
+        .map((i) => ({ price: i.price, date: s.date })),
+    )
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
+  if (!rows.length) return null;
+  const values = rows.map((r) => r.price);
+  return {
+    min: Math.min(...values),
+    max: Math.max(...values),
+    last: rows[0].price,
+    count: values.length,
+  };
 }
 
 /* ---------- Harga pembelian terakhir (untuk perbandingan) ---------- */
-export function lastPurchaseOf(db: DB, vid: string) {
+export function lastPurchaseOf(db: DB, vid: string, excludeId?: string) {
   const rows = db.purchases
-    .filter((p) => p.items.some((i) => i.vid === vid))
+    .filter((p) => p.id !== excludeId && p.items.some((i) => i.vid === vid))
     .sort((a, b) => (a.date < b.date ? 1 : -1));
   const p = rows[0];
   if (!p) return null;

@@ -6,6 +6,7 @@ import { formatDate } from "@/lib/date";
 import { rp } from "@/lib/format";
 import {
   arStatus,
+  itemProfit,
   saleCost,
   saleOps,
   salePaid,
@@ -355,6 +356,36 @@ export function InvoiceView({ invoiceId }: { invoiceId?: string }) {
               <span className="num">{rp(saleProfit(sale))}</span>
             </div>
           </div>
+        </div>
+
+        <div className="mt-4">
+          <div
+            className="text-[12px] font-bold uppercase tracking-wide mb-1"
+            style={{ color: "var(--mu)" }}
+          >
+            Laba per barang (per unit)
+          </div>
+          {sale.items.map((i) => (
+            <div
+              key={i.vid}
+              className="flex flex-wrap justify-between gap-x-3 gap-y-1 text-[13px] py-1 border-b"
+              style={{ borderColor: "#F0F1F6" }}
+            >
+              <span className="font-semibold" style={{ color: "var(--nv)" }}>
+                {variantLabel(db, i.vid)}
+              </span>
+              <span className="num" style={{ color: "var(--mu)" }}>
+                {i.qty} × {rp(i.price)} · modal {rp(i.cost)}/unit
+              </span>
+              <span
+                className="num"
+                style={{ color: itemProfit(i) >= 0 ? "var(--ok)" : "var(--er)" }}
+              >
+                laba {rp(itemProfit(i))}/unit · total{" "}
+                {rp(itemProfit(i) * i.qty)}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
     </>

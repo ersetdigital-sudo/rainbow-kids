@@ -10,7 +10,7 @@ import {
 } from "react";
 import { TODAY } from "./date";
 import { uid } from "./format";
-import { priceRange, salePaid, saleProposed, saleTotal } from "./calc";
+import { salePaid, saleProfit, saleProposed, saleTotal } from "./calc";
 import {
   getServerSnapshot,
   getSnapshot,
@@ -20,6 +20,7 @@ import {
 } from "./persist";
 import type {
   ApprovalField,
+  CostChange,
   Customer,
   CustomerType,
   DB,
@@ -27,6 +28,7 @@ import type {
   OpnameLine,
   Role,
   Sale,
+  SaleRevision,
   Supplier,
 } from "./types";
 
@@ -128,20 +130,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (!draft.customer.trim())
       return { ok: false, msg: "Isi nama pelanggan dulu" };
 
-    // Harga jual harus berada di dalam rentang harga produk.
-    for (const i of draft.items) {
-      const r = priceRange(current, i.vid);
-      if (r && (i.price < r.min || i.price > r.max)) {
-        const v = current.products
-          .flatMap((p) => p.variants)
-          .find((x) => x.id === i.vid);
-        return {
-          ok: false,
-          msg: `Harga ${v?.name ?? "produk"} di luar rentang yang berlaku`,
-        };
-      }
-    }
-
+    // Harga jual bebas diisi (rentang hanya jadi acuan/histori, tidak memblokir).
     const id = `INV-2610-${String(current.sales.length + 1).padStart(4, "0")}`;
     const items = draft.items.map((i) => {
       const v = current.products
@@ -218,6 +207,71 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       warnings,
     };
   }, []);
+
+  /**
+   * Pengajuan ubah harga jual per unit / biaya operasional sebuah invoice.
+   * Baru berlaku setelah disetujui Owner.
+   */
+  const requestSaleRevision = useCallback<StoreValue["requestSaleRevision"]>(
+    (saleId, revision) => {
+      const current = getSnapshot();
+      const sale = current.sales.find((s) => s.id === saleId);
+      if (!sale) return { ok: false, msg: "Invoice tidak ditemukan" };
+      if (
+        current.approvals.some(
+          (a) =>
+            a.kind === "sale" && a.saleId === saleId && a.status === "Menunggu",
+        )
+      )
+        return {
+          ok: false,
+          msg: "Sudah ada pengajuan perubahan yang menunggu approval Owner",
+        };
+
+      const sameItems =
+        sale.items.length === revision.items.length &&
+        sale.items.every((it, i) => {
+          const next = revision.items[i];
+          return (
+            next &&
+            next.vid === it.vid &&
+            next.qty === it.qty &&
+            +next.price === +it.price
+          );
+        });
+      const sameOps =
+        +sale.ship === +revision.ship &&
+        +sale.pack === +revision.pack &&
+        +sale.other === +revision.other;
+      if (sameItems && sameOps) return { ok: false, msg: "Tidak ada perubahan" };
+
+      const time = `${TODAY} ${new Date().toTimeString().slice(0, 5)}`;
+      const after = saleProfit({ ...sale, ...revision });
+      setSnapshot((prev) => ({
+        ...prev,
+        approvals: [
+          ...prev.approvals,
+          {
+            id: `AP-${String(prev.approvals.length + 1).padStart(3, "0")}`,
+            kind: "sale" as const,
+            type: "Harga & biaya invoice",
+            saleId,
+            before: saleProfit(sale),
+            after,
+            revision,
+            user: prev.user,
+            time,
+            status: "Menunggu" as const,
+          },
+        ],
+      }));
+      return {
+        ok: true,
+        msg: "Pengajuan perubahan dikirim ke Owner untuk approval",
+      };
+    },
+    [],
+  );
 
   /**
    * Pembayaran sebagian langsung berlaku. Pelunasan (mencakup sisa tagihan)
@@ -418,28 +472,37 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const time = `${TODAY} ${new Date().toTimeString().slice(0, 5)}`;
 
       setSnapshot((prev) => {
-        const approvals = [...prev.approvals];
+        // Satu nota belanja = satu pengajuan approval (bukan per barang).
+        const costChanges: CostChange[] = [];
+        let beforeTotal = 0;
         for (const item of draft.items) {
-          const product = prev.products.find((p) =>
-            p.variants.some((v) => v.id === item.vid),
-          );
-          const variant = product?.variants.find((v) => v.id === item.vid);
-          if (variant && variant.cost !== item.cost) {
-            approvals.push({
-              id: `AP-${String(approvals.length + 1).padStart(3, "0")}`,
-              kind: "variant" as const,
-              type: "Harga modal",
+          const variant = prev.products
+            .flatMap((p) => p.variants)
+            .find((v) => v.id === item.vid);
+          beforeTotal += item.qty * (variant?.cost ?? item.cost);
+          if (variant && variant.cost !== item.cost)
+            costChanges.push({
               vid: item.vid,
-              field: "cost" as const,
               before: variant.cost,
               after: item.cost,
-              user: prev.user,
-              time,
-              status: "Menunggu" as const,
-              ref: id,
             });
-          }
         }
+        const approvals = [
+          ...prev.approvals,
+          {
+            id: `AP-${String(prev.approvals.length + 1).padStart(3, "0")}`,
+            kind: "nota" as const,
+            type: "Izin belanja nota",
+            purchaseId: id,
+            before: beforeTotal,
+            after: draft.items.reduce((a, i) => a + i.qty * i.cost, 0),
+            costChanges,
+            user: prev.user,
+            time,
+            status: "Menunggu" as const,
+            ref: id,
+          },
+        ];
         return {
           ...prev,
           approvals,
@@ -657,7 +720,69 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
-      // 3. Ubah data varian / rentang harga produk
+      // 3. Harga & biaya invoice (penjualan)
+      if (a.kind === "sale") {
+        const history = [...prev.history];
+        const sales = prev.sales.map((s) => {
+          if (s.id !== a.saleId || !ok || !a.revision) return s;
+          a.revision.items.forEach((item, idx) => {
+            const before = s.items[idx];
+            if (before && before.price !== item.price)
+              history.push({
+                vid: item.vid,
+                date: TODAY,
+                type: "Harga" as const,
+                desc: `Harga jual ${s.id}: Rp ${Number(before.price).toLocaleString("id-ID")} → Rp ${Number(item.price).toLocaleString("id-ID")}`,
+                user: prev.user,
+              });
+          });
+          return { ...s, ...a.revision };
+        });
+        return {
+          ...prev,
+          sales,
+          history,
+          approvals: prev.approvals.map((x) =>
+            x.id === id
+              ? { ...x, status: ok ? "Disetujui" : "Ditolak", by: prev.user }
+              : x,
+          ),
+        };
+      }
+
+      // 4. Izin belanja satu nota supplier (sekaligus harga beli baru)
+      if (a.kind === "nota") {
+        const history = [...prev.history];
+        const products = ok
+          ? prev.products.map((p) => ({
+              ...p,
+              variants: p.variants.map((v) => {
+                const change = (a.costChanges ?? []).find((c) => c.vid === v.id);
+                if (!change) return v;
+                history.push({
+                  vid: v.id,
+                  date: TODAY,
+                  type: "Harga" as const,
+                  desc: `Harga modal (nota ${a.purchaseId}): Rp ${Number(change.before).toLocaleString("id-ID")} → Rp ${Number(change.after).toLocaleString("id-ID")}`,
+                  user: prev.user,
+                });
+                return { ...v, cost: change.after };
+              }),
+            }))
+          : prev.products;
+        return {
+          ...prev,
+          products,
+          history,
+          approvals: prev.approvals.map((x) =>
+            x.id === id
+              ? { ...x, status: ok ? "Disetujui" : "Ditolak", by: prev.user }
+              : x,
+          ),
+        };
+      }
+
+      // 5. Ubah data varian / rentang harga produk
       const history = [...prev.history];
       const products = prev.products.map((p) => {
         const variant = p.variants.find((v) => v.id === a.vid);
@@ -769,6 +894,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       addCustomer,
       addSupplier,
       saveSale,
+      requestSaleRevision,
       recordPayment,
       addProduct,
       submitChange,
@@ -791,6 +917,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       addCustomer,
       addSupplier,
       saveSale,
+      requestSaleRevision,
       recordPayment,
       addProduct,
       submitChange,
@@ -835,6 +962,7 @@ type StoreValue = {
   }) => Result;
   addSupplier: (s: { name: string; phone?: string; address?: string }) => Result;
   saveSale: (draft: SaleDraft) => Result;
+  requestSaleRevision: (saleId: string, revision: SaleRevision) => Result;
   recordPayment: (
     saleId: string,
     p: { date: string; amt: number; method: string },

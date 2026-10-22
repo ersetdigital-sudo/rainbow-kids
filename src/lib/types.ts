@@ -113,11 +113,35 @@ export type HistoryEntry = {
 
 export type ApprovalField = "name" | "cost" | "price" | "minPrice" | "maxPrice";
 
-export type ApprovalKind = "variant" | "payment" | "purchase";
+export type ApprovalKind =
+  | "variant"
+  | "payment"
+  | "purchase"
+  | "sale"
+  | "nota";
+
+/** Usulan perubahan harga jual / biaya sebuah invoice. */
+export type SaleRevision = {
+  items: SaleItem[];
+  ship: number;
+  pack: number;
+  other: number;
+};
+
+/** Selisih harga beli sebuah barang pada nota pembelian. */
+export type CostChange = {
+  vid: string;
+  before: number;
+  after: number;
+};
 
 export type Approval = {
   id: string;
-  /** variant = ubah data varian/produk, payment = pelunasan invoice, purchase = status bayar pembelian */
+  /**
+   * variant = ubah data varian/produk, payment = pelunasan invoice,
+   * purchase = status bayar pembelian, sale = harga & biaya invoice,
+   * nota = izin belanja satu nota supplier.
+   */
   kind: ApprovalKind;
   type: string;
   vid?: string;
@@ -126,6 +150,10 @@ export type Approval = {
   after: string | number;
   saleId?: string;
   purchaseId?: string;
+  /** Rincian usulan untuk kind "sale". */
+  revision?: SaleRevision;
+  /** Perubahan harga beli untuk kind "nota". */
+  costChanges?: CostChange[];
   user: string;
   time: string;
   status: "Menunggu" | "Disetujui" | "Ditolak";

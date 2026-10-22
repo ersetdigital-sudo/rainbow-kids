@@ -75,8 +75,9 @@ PEMBELIAN SUPPLIER ──konfirmasi──▶ stok bertambah
                                         
 PENJUALAN ──▶ stok berkurang (boleh minus → ditandai merah + peringatan restock)
      │
-     ├── harga jual bebas per transaksi, wajib di dalam rentang min–max produk
+     ├── harga jual bebas per transaksi (histori harga tampil sebagai acuan)
      ├── ongkir + packing + biaya lain per order → laba order = penjualan − modal − biaya
+     ├── ubah harga unit / biaya order → PENGAJUAN → approval Owner → berlaku
      └── tempo → PIUTANG: belum jatuh tempo / jatuh tempo / terlambat / menunggu approval / lunas
                      └─ bayar sebagian → langsung berlaku
                      └─ pelunasan     → PENGAJUAN → approval Owner → status Lunas
@@ -87,7 +88,10 @@ PENJUALAN ──▶ stok berkurang (boleh minus → ditandai merah + peringatan 
 | Aturan | Implementasi |
 | --- | --- |
 | Pelanggan & supplier | Dipilih dari popup data tersimpan (`Picker`), bisa tambah baru langsung dari popup |
-| Rentang harga jual | Disimpan di level produk (`minPrice`/`maxPrice`); harga di luar rentang ditolak saat simpan |
+| Harga jual bebas | Saat transaksi baru, harga jual diisi bebas; rentang `minPrice`/`maxPrice` produk hanya acuan, dan form menampilkan histori harga jual sebelumnya (terendah–tertinggi) |
+| Ubah harga & biaya invoice | Di detail penjualan bisa ubah harga per unit serta ekspedisi/packing/biaya lain; hasilnya pengajuan approval Owner, laba sebelum/sesudah tetap terlihat |
+| Laba per unit | Detail penjualan, detail piutang, dan rincian internal invoice menampilkan laba tiap unit di samping laba total order |
+| Approval nota belanja | Satu nota supplier = satu pengajuan approval; tombol “Detail” menampilkan barang yang dibelanjakan beserta naik/turun harga beli |
 | Harga modal | Tampil di layar internal (form & daftar); **tidak pernah** tampil di invoice A4 pelanggan |
 | Stok minus | Penjualan tetap dicatat, stok jadi minus → badge merah + label “PERLU RESTOCK” + banner peringatan di Dashboard & Produk |
 | Pelunasan invoice | Pembayaran sebagian berlaku langsung; pelunasan jadi pengajuan dan baru berlaku setelah disetujui Owner |
@@ -98,10 +102,10 @@ PENJUALAN ──▶ stok berkurang (boleh minus → ditandai merah + peringatan 
 ## Fitur
 
 - **Dashboard** — omzet hari/bulan, estimasi laba, total & nilai stok, grafik area 14 hari, piutang aktif, transaksi terbaru, banner peringatan restock.
-- **Penjualan** — pelanggan dari popup data tersimpan (+ tambah baru), harga jual per transaksi dalam rentang produk, biaya ongkir/packing/lain, filter status bayar (lunas/belum lunas) & jenis, pencarian no. invoice/pelanggan, detail order + laba, ekspor Excel.
-- **Piutang** — ringkasan belum jatuh tempo / jatuh tempo / terlambat / menunggu approval / lunas, pencarian no. invoice/pelanggan, pembayaran sebagian (langsung berlaku) & pengajuan pelunasan (approval Owner), ekspor Excel.
+- **Penjualan** — pelanggan dari popup data tersimpan (+ tambah baru), harga jual bebas dengan histori harga sebagai acuan, kolom tanggal order + jatuh tempo, biaya ongkir/packing/lain, filter status bayar (lunas/belum lunas) & jenis, pencarian no. invoice/pelanggan, detail order + laba total & laba per unit, pengajuan ubah harga/biaya, ekspor Excel.
+- **Piutang** — ringkasan total tagihan (belum jatuh tempo / jatuh tempo / terlambat) + kartu status, pencarian no. invoice/pelanggan, pembayaran sebagian (langsung berlaku) & pengajuan pelunasan (approval Owner), ekspor Excel.
 - **Produk & Stok** — kategori bebas, varian, rentang harga jual min–max, stok minus/prioritas restock, riwayat perubahan, pengajuan ubah harga (lewat approval).
-- **Pembelian Supplier** — supplier dari popup data tersimpan (+ tambah baru), perbandingan harga beli terakhir (naik/turun), status “Belum Lunas” → approval Owner → “Lunas”, stok otomatis bertambah.
+- **Pembelian Supplier** — supplier dari popup data tersimpan (+ tambah baru), satu nota = satu pengajuan approval (detail nota menampilkan barang + perubahan harga beli), status “Belum Lunas” → approval Owner → “Lunas”, stok otomatis bertambah.
 - **Stok Opname** — input stok fisik, penyebab selisih, persetujuan Owner sebelum stok disesuaikan.
 - **Invoice** — template A4 siap cetak/PDF (tanpa harga modal) + panel rincian internal (pembayaran, sisa tagihan, laba).
 - **Approval & Audit** — jejak audit untuk harga, nama varian, pelunasan invoice, dan status pembelian.
