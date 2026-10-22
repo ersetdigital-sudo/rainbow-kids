@@ -216,6 +216,113 @@
   color: #dc2626;
 }
 
+/* ---------------- Kartu metrik dashboard ---------------- */
+.kpi2 {
+  position: relative;
+  overflow: hidden;
+  padding: 16px 18px 20px;
+  border-radius: 18px;
+  background: #fff;
+  border: 1px solid var(--ln);
+  box-shadow:
+    0 1px 2px rgba(4, 18, 63, 0.04),
+    0 10px 26px -22px rgba(4, 18, 63, 0.35);
+  transition:
+    box-shadow 0.22s ease,
+    border-color 0.22s ease;
+  will-change: transform;
+}
+.kpi2:hover {
+  border-color: #d9e1f2;
+  box-shadow:
+    0 1px 2px rgba(4, 18, 63, 0.05),
+    0 20px 40px -24px rgba(4, 18, 63, 0.5);
+}
+.kpi2-orb {
+  position: absolute;
+  right: -42px;
+  top: -48px;
+  width: 136px;
+  height: 136px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 35% 35%,
+    var(--kt) 0%,
+    rgba(255, 255, 255, 0) 72%
+  );
+  transition: transform 0.4s ease;
+  pointer-events: none;
+}
+.kpi2:hover .kpi2-orb {
+  transform: scale(1.14);
+}
+.kpi2-top {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.kpi2-ic {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  background: var(--kt);
+  color: var(--kc);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.75);
+}
+.kpi2-l {
+  position: relative;
+  margin-top: 14px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--mu);
+}
+.kpi2-v {
+  position: relative;
+  margin-top: 5px;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  color: var(--nv);
+}
+.kpi2-sub {
+  position: relative;
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: var(--mu);
+}
+.kpi2-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  transform-origin: left center;
+  background: linear-gradient(90deg, var(--kc), rgba(255, 255, 255, 0) 88%);
+  opacity: 0.55;
+}
+
+@media (max-width: 767px) {
+  .kpi2 {
+    padding: 14px 14px 18px;
+  }
+  .kpi2-v {
+    font-size: 20px;
+  }
+  .kpi2-ic {
+    width: 34px;
+    height: 34px;
+    border-radius: 11px;
+  }
+}
+
 /* ---------------- Buttons ---------------- */
 .btn {
   display: inline-flex;

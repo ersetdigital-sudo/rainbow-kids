@@ -2,17 +2,25 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { motion } from "motion/react";
 import { addDays, formatDate, TODAY } from "@/lib/date";
 import { rp } from "@/lib/format";
 import { allV, arStatus, salePaid, saleProfit, saleTotal } from "@/lib/calc";
 import { useStore } from "@/lib/store";
 import { AreaChart } from "@/components/charts/AreaChart";
 import { Badge } from "@/components/ui/Badge";
-import { Kpi } from "@/components/ui/Kpi";
+import { KpiCard } from "@/components/ui/KpiCard";
 import { PageHead } from "@/components/ui/PageHead";
 import { SaleDetailDrawer } from "@/components/modules/sales/SaleDetailDrawer";
 import { SaleFormDrawer } from "@/components/modules/sales/SaleFormDrawer";
 import { PurchaseFormDrawer } from "@/components/modules/purchases/PurchaseDrawers";
+
+/** Animasi masuk untuk kartu-kartu section dashboard. */
+const fadeUp = (delay: number) => ({
+  initial: { opacity: 0, y: 14 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.45, delay, ease: "easeOut" as const },
+});
 
 export function DashboardView() {
   const { db } = useStore();
@@ -182,47 +190,56 @@ export function DashboardView() {
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-        <Kpi
+        <KpiCard
           label="Omzet hari ini"
           value={rp(td)}
-          sub={`${today.length} transaksi`}
+          count={td}
+          format={(n) => rp(Math.round(n))}
+          sub={`${today.length} transaksi · vs kemarin`}
           icon="wallet"
-          color="#9A6F00"
-          bg="#FFF4CC"
+          accent="#9A6F00"
+          tint="#FFF4CC"
           trend={tr(td, yesterday)}
-          highlight="vs kemarin"
+          delay={0}
         />
-        <Kpi
+        <KpiCard
           label="Omzet bulan ini"
           value={rp(mt)}
-          sub={`${month.length} transaksi`}
+          count={mt}
+          format={(n) => rp(Math.round(n))}
+          sub={`${month.length} transaksi · vs periode lalu`}
           icon="trend"
-          color="#15803D"
-          bg="#E7F6EC"
+          accent="#15803D"
+          tint="#E7F6EC"
           trend={tr(mt, prev)}
-          highlight="vs periode lalu"
+          delay={0.06}
         />
-        <Kpi
+        <KpiCard
           label="Estimasi laba"
           value={rp(pf)}
+          count={pf}
+          format={(n) => rp(Math.round(n))}
           sub={`Margin ${Math.round((pf / (mt || 1)) * 100)}% setelah biaya`}
           icon="spark"
-          color="#04123F"
-          bg="#E6EAF4"
+          accent="#04123F"
+          tint="#E6EAF4"
+          delay={0.12}
         />
-        <Kpi
+        <KpiCard
           label="Total stok"
           value={`${stock.toLocaleString("id-ID")} unit`}
-          sub={`Nilai modal ${rp(stockVal)}`}
+          count={stock}
+          format={(n) => `${Math.round(n).toLocaleString("id-ID")} unit`}
+          sub={`Nilai modal ${rp(stockVal)} · ${low.length} varian menipis`}
           icon="box"
-          color="#04123F"
-          bg="#E6EAF4"
-          highlight={`${low.length} varian menipis`}
+          accent="#04123F"
+          tint="#E6EAF4"
+          delay={0.18}
         />
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4 mt-4">
-        <div className="card p-5 lg:col-span-2">
+        <motion.div className="card p-5 lg:col-span-2" {...fadeUp(0.24)}>
           <div className="flex justify-between items-start mb-2">
             <div>
               <div className="font-bold">Penjualan 14 hari terakhir</div>
@@ -237,9 +254,9 @@ export function DashboardView() {
             <span className="bd b-ac">Harian</span>
           </div>
           <AreaChart days={days} values={vals} />
-        </div>
+        </motion.div>
 
-        <div className="card p-5">
+        <motion.div className="card p-5" {...fadeUp(0.3)}>
           <div className="flex justify-between items-center">
             <div className="font-bold">Piutang aktif</div>
             <Link
@@ -310,11 +327,11 @@ export function DashboardView() {
               </div>
             )}
           </div>
-        </div>
+        </motion.div>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4 mt-4">
-        <div className="card lg:col-span-2">
+        <motion.div className="card lg:col-span-2" {...fadeUp(0.36)}>
           <div className="flex justify-between items-center px-5 pt-5 pb-3">
             <div className="font-bold">Transaksi terbaru</div>
             <Link
@@ -371,9 +388,9 @@ export function DashboardView() {
               </tbody>
             </table>
           </div>
-        </div>
+        </motion.div>
 
-        <div className="card p-5">
+        <motion.div className="card p-5" {...fadeUp(0.42)}>
           <div className="font-bold mb-3">Stok perlu restock</div>
           {low.map((v) => (
             <div
@@ -406,7 +423,7 @@ export function DashboardView() {
               {pending} perubahan menunggu persetujuan →
             </Link>
           )}
-        </div>
+        </motion.div>
       </div>
 
       <SaleFormDrawer
