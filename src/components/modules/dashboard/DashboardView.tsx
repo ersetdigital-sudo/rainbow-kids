@@ -243,7 +243,6 @@ export function DashboardView() {
             tint="#EEF3FF"
             trend={tr(mt, prev)}
             delay={0}
-            featured
           />
           <KpiCard
             label="Omzet hari ini"

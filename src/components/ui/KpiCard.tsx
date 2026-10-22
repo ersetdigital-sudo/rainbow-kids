@@ -19,7 +19,6 @@ export function KpiCard({
   count,
   format,
   delay = 0,
-  featured = false,
 }: {
   label: string;
   value: string;
@@ -33,8 +32,6 @@ export function KpiCard({
   /** Format angka selama animasi berjalan. */
   format?: (n: number) => string;
   delay?: number;
-  /** Kartu utama dengan latar gradien biru. */
-  featured?: boolean;
 }) {
   const [shown, setShown] = useState<number | null>(
     count === undefined ? null : 0,
@@ -62,11 +59,9 @@ export function KpiCard({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.45, delay, ease: [0.22, 1, 0.36, 1] }}
       whileHover={{ y: -4 }}
-      className={`kpi2${featured ? " kpi2-f" : ""}`}
+      className="kpi2"
       style={{ ["--kc" as string]: accent, ["--kt" as string]: tint }}
     >
-      <span className="kpi2-orb" aria-hidden="true" />
-
       <div className="kpi2-top">
         {icon ? (
           <span className="kpi2-ic">
@@ -96,14 +91,6 @@ export function KpiCard({
       <div className="kpi2-l">{label}</div>
       <div className="kpi2-v num">{display}</div>
       {sub && <div className="kpi2-sub">{sub}</div>}
-
-      <motion.span
-        className="kpi2-bar"
-        aria-hidden="true"
-        initial={{ scaleX: 0 }}
-        animate={{ scaleX: 1 }}
-        transition={{ duration: 0.8, delay: delay + 0.15, ease: "easeOut" }}
-      />
     </motion.div>
   );
 }
