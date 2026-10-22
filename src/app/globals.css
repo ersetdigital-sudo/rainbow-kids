@@ -722,6 +722,24 @@ table.t {
   text-align: right !important;
 }
 
+/* Tabel lebar (mis. Penjualan): kolom sekunder disembunyikan dan jarak
+   dirapatkan supaya tabel tidak perlu digeser ke samping di layar sedang. */
+@media (min-width: 1024px) and (max-width: 1599px) {
+  .t th.h-opt,
+  .t td.h-opt {
+    display: none;
+  }
+  .t th,
+  .t td {
+    padding-left: 9px;
+    padding-right: 9px;
+  }
+  .t td.h-wrap {
+    white-space: normal;
+    min-width: 96px;
+  }
+}
+
 /* ---------------- Badges ---------------- */
 .bd {
   display: inline-flex;

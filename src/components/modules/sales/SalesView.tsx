@@ -99,7 +99,12 @@ export function SalesView() {
       label: "Jatuh tempo",
       render: (s) => (s.due ? formatDate(s.due) : "—"),
     },
-    { key: "customer", label: "Pelanggan", render: (s) => s.customer },
+    {
+      key: "customer",
+      label: "Pelanggan",
+      cellClass: "h-wrap",
+      render: (s) => s.customer,
+    },
     {
       key: "type",
       label: "Jenis",
@@ -115,6 +120,7 @@ export function SalesView() {
       key: "cost",
       label: "Modal",
       align: "right",
+      cellClass: "h-opt",
       render: (s) => (
         <span className="num" style={{ color: "var(--mu)" }}>
           {rp(saleCost(s))}
@@ -125,6 +131,7 @@ export function SalesView() {
       key: "ops",
       label: "Biaya ops",
       align: "right",
+      cellClass: "h-opt",
       render: (s) => (
         <span className="num" style={{ color: "var(--mu)" }}>
           {rp(saleOps(s))}

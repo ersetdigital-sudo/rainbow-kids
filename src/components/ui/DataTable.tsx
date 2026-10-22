@@ -31,7 +31,12 @@ export function DataTable<T>({
         <thead>
           <tr>
             {columns.map((c) => (
-              <th key={c.key} className={c.align === "right" ? "r" : undefined}>
+              <th
+                key={c.key}
+                className={[c.align === "right" ? "r" : "", c.cellClass ?? ""]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
                 {c.label}
               </th>
             ))}
