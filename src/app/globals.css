@@ -1035,10 +1035,6 @@ table.t {
   .invwrap {
     padding: 10px;
   }
-  .a4 {
-    zoom: 0.4;
-    min-height: auto;
-  }
   .t.pm tr {
     grid-template-columns: repeat(3, 1fr);
     column-gap: 8px;

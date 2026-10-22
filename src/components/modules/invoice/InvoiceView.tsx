@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { formatDate } from "@/lib/date";
 import { rp } from "@/lib/format";
@@ -22,6 +22,24 @@ export function InvoiceView({ invoiceId }: { invoiceId?: string }) {
   const { db } = useStore();
   const fallback = db.sales[db.sales.length - 1]?.id ?? "";
   const [selected, setSelected] = useState(invoiceId ?? fallback);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  /** Skala lembar A4 mengikuti lebar layar supaya selalu tampil utuh (210mm = 794px). */
+  const [zoom, setZoom] = useState(1);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const fit = () => {
+      const cs = getComputedStyle(el);
+      const avail =
+        el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      setZoom(Math.min(1, Math.max(0.3, avail / 794)));
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const sale = db.sales.find((s) => s.id === selected) ?? db.sales[db.sales.length - 1];
   if (!sale) {
@@ -70,8 +88,8 @@ export function InvoiceView({ invoiceId }: { invoiceId?: string }) {
         }
       />
 
-      <div className="invwrap">
-        <div className="a4">
+      <div className="invwrap" ref={wrapRef}>
+        <div className="a4" style={{ zoom }}>
           <div
             style={{
               display: "flex",
