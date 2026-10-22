@@ -13,6 +13,19 @@ import {
   VariantHistoryDrawer,
 } from "./StockDrawers";
 
+/** Inisial nama produk untuk avatar kartu varian. */
+const initials = (name: string) =>
+  name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+
+const stockTone = (stock: number) =>
+  stock < 0 ? "b-er" : stock < 15 ? "b-wa" : "b-ok";
+
 export function StockView() {
   const { db } = useStore();
   const [cat, setCat] = useState("");
@@ -26,8 +39,10 @@ export function StockView() {
     [db.products],
   );
 
+  const variants = useMemo(() => allV(db), [db]);
+
   const list = useMemo(() => {
-    const filtered = allV(db).filter(
+    const filtered = variants.filter(
       (v) =>
         (!cat || v.cat === cat) &&
         (!query ||
@@ -40,45 +55,49 @@ export function StockView() {
       const d = rank(a) - rank(b);
       return d !== 0 ? d : a.pname.localeCompare(b.pname);
     });
-  }, [db, cat, query]);
+  }, [variants, cat, query]);
 
   const minus = list.filter((v) => v.stock < 0);
   const restock = list.filter((v) => v.stock >= 0 && v.stock < 15);
+
+  const stockValue = variants.reduce(
+    (x, v) => x + Math.max(v.stock, 0) * v.cost,
+    0,
+  );
+  const stockUnits = variants.reduce((x, v) => x + Math.max(v.stock, 0), 0);
+  const minusAll = variants.filter((v) => v.stock < 0).length;
+  const lowAll = variants.filter((v) => v.stock >= 0 && v.stock < 15).length;
+
+  const countIn = (c: string) =>
+    c ? variants.filter((v) => v.cat === c).length : variants.length;
 
   const columns: Column<FlatVariant>[] = [
     {
       key: "pname",
       label: "Produk",
       render: (v) => (
-        <span>
-          <span className="font-semibold">{v.pname}</span>
-          {v.stock < 0 && (
-            <span
-              className="ml-2 text-[11.5px] font-bold"
-              style={{ color: "var(--er)" }}
-            >
-              PERLU RESTOCK
+        <div className="st-prod">
+          <span className="st-av" aria-hidden="true">
+            {initials(v.pname)}
+          </span>
+          <span className="st-prod-txt">
+            <span className="st-prod-name">
+              {v.pname}
+              {v.stock < 0 && <span className="st-flag">Restock</span>}
             </span>
-          )}
-        </span>
+            <span className="st-prod-sub">
+              {v.name} · {v.cat}
+            </span>
+          </span>
+        </div>
       ),
-    },
-    { key: "name", label: "Varian", render: (v) => v.name },
-    {
-      key: "cat",
-      label: "Kategori",
-      render: (v) => <span style={{ color: "var(--mu)" }}>{v.cat}</span>,
     },
     {
       key: "stock",
       label: "Stok",
       align: "right",
       render: (v) => (
-        <span
-          className={`bd ${v.stock < 0 ? "b-er" : v.stock < 15 ? "b-wa" : "b-ok"}`}
-        >
-          {v.stock}
-        </span>
+        <span className={`bd num ${stockTone(v.stock)}`}>{v.stock}</span>
       ),
     },
     {
@@ -92,8 +111,10 @@ export function StockView() {
       label: "Rentang harga jual",
       align: "right",
       render: (v) => (
-        <span className="num">
-          {rp(v.minPrice)} – {rp(v.maxPrice)}
+        <span className="st-range">
+          <span className="num">{rp(v.minPrice)}</span>
+          <span className="st-range-sep">–</span>
+          <span className="num">{rp(v.maxPrice)}</span>
         </span>
       ),
     },
@@ -135,67 +156,125 @@ export function StockView() {
         }
       />
 
-      {(minus.length > 0 || restock.length > 0) && (
-        <div
-          className="card p-4 mb-4"
-          style={{
-            borderColor: minus.length ? "#f7c9c9" : "#f6e4a6",
-            background: minus.length ? "#FDECEC" : "#FFF8DB",
-          }}
-        >
-          <div
-            className="font-bold text-[13.5px]"
-            style={{ color: minus.length ? "var(--er)" : "var(--wa)" }}
-          >
-            ⚠ Peringatan stok — perlu restock
+      {/* Ringkasan persediaan */}
+      <section className="st-hero">
+        <div className="st-hero-body">
+          <div>
+            <div className="st-kicker">Nilai stok tersedia</div>
+            <div className="st-value num">{rp(stockValue)}</div>
+            <div className="st-chips">
+              <span className="st-chip">
+                {variants.length} varian · {db.products.length} produk
+              </span>
+              <span className="st-chip num">{stockUnits} unit siap jual</span>
+            </div>
           </div>
-          <div className="text-[12.5px] mt-1" style={{ color: "var(--tx)" }}>
-            {minus.length > 0 && (
-              <div>
-                <b>{minus.length} varian stok minus</b> (terjual melebihi stok
-                sistem):{" "}
-                {minus
-                  .slice(0, 4)
-                  .map((v) => `${v.pname} · ${v.name} (${v.stock})`)
-                  .join(", ")}
-              </div>
-            )}
-            {restock.length > 0 && (
-              <div>
-                <b>{restock.length} varian menipis</b> (di bawah 15):{" "}
-                {restock
-                  .slice(0, 4)
-                  .map((v) => `${v.pname} · ${v.name} (${v.stock})`)
-                  .join(", ")}
-              </div>
-            )}
+
+          <div className="st-tiles">
+            <div className="st-tile">
+              <div className="l">Varian</div>
+              <div className="v num">{variants.length}</div>
+            </div>
+            <div className="st-tile">
+              <div className="l">Kategori</div>
+              <div className="v num">{cats.length}</div>
+            </div>
+            <div className={`st-tile${minusAll ? " bad" : ""}`}>
+              <div className="l">Stok minus</div>
+              <div className="v num">{minusAll}</div>
+            </div>
+            <div className={`st-tile${lowAll ? " warn" : ""}`}>
+              <div className="l">Menipis (&lt;15)</div>
+              <div className="v num">{lowAll}</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {(minus.length > 0 || restock.length > 0) && (
+        <div className={`st-alert${minus.length ? " bad" : ""}`}>
+          <span className="st-alert-ic" aria-hidden="true">
+            !
+          </span>
+          <div>
+            <div className="st-alert-t">Peringatan stok — perlu restock</div>
+            <div className="st-alert-b">
+              {minus.length > 0 && (
+                <div>
+                  <b>{minus.length} varian stok minus</b> (terjual melebihi stok
+                  sistem):{" "}
+                  {minus
+                    .slice(0, 4)
+                    .map((v) => `${v.pname} · ${v.name} (${v.stock})`)
+                    .join(", ")}
+                </div>
+              )}
+              {restock.length > 0 && (
+                <div>
+                  <b>{restock.length} varian menipis</b> (di bawah 15):{" "}
+                  {restock
+                    .slice(0, 4)
+                    .map((v) => `${v.pname} · ${v.name} (${v.stock})`)
+                    .join(", ")}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
 
-      <div className="tabs mb-4">
-        {["", ...cats].map((c) => (
-          <button
-            key={c || "all"}
-            type="button"
-            className={cat === c ? "on" : undefined}
-            onClick={() => setCat(c)}
-          >
-            {c || "Semua"}
-          </button>
-        ))}
-      </div>
-
-      <div className="card">
-        <div className="p-4">
-          <input
-            className="max-w-xs"
-            placeholder="Cari produk / varian"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
+      <div className="card mt-4 st-list">
+        <div className="st-listhead">
+          <div>
+            <div className="st-list-title">Daftar varian</div>
+            <div className="st-list-sub">
+              {list.length} dari {variants.length} varian
+            </div>
+          </div>
+          <div className="st-search">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              aria-hidden="true"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
+            </svg>
+            <input
+              placeholder="Cari produk / varian"
+              aria-label="Cari produk atau varian"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
         </div>
-        <DataTable columns={columns} rows={list} rowKey={(v) => v.id} />
+
+        <div className="st-pills">
+          {["", ...cats].map((c) => (
+            <button
+              key={c || "all"}
+              type="button"
+              aria-pressed={cat === c}
+              className={cat === c ? "on" : undefined}
+              onClick={() => setCat(c)}
+            >
+              {c || "Semua"}
+              <b className="num">{countIn(c)}</b>
+            </button>
+          ))}
+        </div>
+
+        <DataTable
+          columns={columns}
+          rows={list}
+          rowKey={(v) => v.id}
+          emptyText="Tidak ada varian yang cocok"
+        />
       </div>
 
       <VariantHistoryDrawer vid={historyId} onClose={() => setHistoryId(null)} />
