@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { InvoiceView } from "@/components/modules/invoice/InvoiceView";
 
@@ -16,7 +17,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function InvoiceDetailPage({ params }: Props) {
+/** Membaca `params` di dalam Suspense agar App Shell tetap URL-independent. */
+async function InvoiceDetail({ params }: Props) {
   const { id } = await params;
   return <InvoiceView invoiceId={id} />;
+}
+
+export default function InvoiceDetailPage({ params }: Props) {
+  return (
+    <Suspense fallback={<p className="text-sm">Memuat invoice…</p>}>
+      <InvoiceDetail params={params} />
+    </Suspense>
+  );
 }

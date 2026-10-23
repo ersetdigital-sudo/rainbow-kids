@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { addDays, TODAY } from "@/lib/date";
 import { rp } from "@/lib/format";
+import { salePriceHistory } from "@/lib/calc";
 import { useStore, type SaleDraft } from "@/lib/store";
 import { Drawer } from "@/components/ui/Drawer";
 import { Picker } from "@/components/ui/Picker";
@@ -96,7 +97,7 @@ export function SaleFormDrawer({
               Batal
             </button>
             <button type="button" className="btn p" onClick={submit}>
-              Simpan transaksi
+              Ajukan invoice
             </button>
           </>
         }
@@ -157,9 +158,7 @@ export function SaleFormDrawer({
         <div className="space-y-2">
           {draft.items.map((it, i) => {
             const info = priced[i];
-            const outOfRange = info.v
-              ? it.price < info.v.minPrice || it.price > info.v.maxPrice
-              : false;
+            const hist = salePriceHistory(db, it.vid);
             return (
               <div key={i}>
                 <div className="grid grid-cols-12 gap-2 items-end">
@@ -197,11 +196,6 @@ export function SaleFormDrawer({
                     <input
                       type="number"
                       value={it.price}
-                      style={
-                        outOfRange
-                          ? { borderColor: "var(--er)", color: "var(--er)" }
-                          : undefined
-                      }
                       onChange={(e) => setItem(i, { price: +e.target.value })}
                     />
                   </div>
@@ -227,14 +221,11 @@ export function SaleFormDrawer({
                     className="text-[11.5px] mt-1"
                     style={{ color: "var(--mu)" }}
                   >
-                    Standar {rp(info.v.price)} · rentang {rp(info.v.minPrice)} –{" "}
-                    {rp(info.v.maxPrice)} · modal {rp(info.v.cost)} (internal)
-                    {outOfRange && (
-                      <span style={{ color: "var(--er)" }}>
-                        {" "}
-                        · harga di luar rentang
-                      </span>
-                    )}
+                    Standar {rp(info.v.price)} · modal {rp(info.v.cost)}{" "}
+                    (internal) · laba {rp(it.price - info.v.cost)}/unit ·{" "}
+                    {hist
+                      ? `histori jual ${rp(hist.min)} – ${rp(hist.max)} (${hist.count} transaksi, terakhir ${rp(hist.last)})`
+                      : "belum ada histori harga jual"}
                   </div>
                 )}
               </div>
@@ -330,6 +321,12 @@ export function SaleFormDrawer({
             <span>Laba order</span>
             <span className="num gold">{rp(profit)}</span>
           </div>
+        </div>
+
+        <div className="text-[11.5px] mt-2" style={{ color: "var(--wa)" }}>
+          Invoice diajukan ke Owner untuk approval — transaksi, pengurangan stok,
+          dan pembayaran baru tercatat setelah disetujui. Rincian laba tiap jenis
+          barang tampil di halaman Approval.
         </div>
       </Drawer>
 

@@ -7,6 +7,7 @@ import { useStore } from "@/lib/store";
 import { Badge } from "@/components/ui/Badge";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { PageHead } from "@/components/ui/PageHead";
+import { ApprovalDetailDrawer } from "./ApprovalDetailDrawer";
 import type { Approval } from "@/lib/types";
 
 const FILTERS = ["Menunggu", "Disetujui", "Ditolak", "Semua"] as const;
@@ -15,6 +16,7 @@ type Filter = (typeof FILTERS)[number];
 export function ApprovalsView() {
   const { db, decideApproval, toast } = useStore();
   const [filter, setFilter] = useState<Filter>("Menunggu");
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const list = useMemo(
     () =>
@@ -34,6 +36,26 @@ export function ApprovalsView() {
     if (a.kind === "purchase") {
       const p = db.purchases.find((x) => x.id === a.purchaseId);
       return p ? `${p.id} · ${p.supplier}` : (a.purchaseId ?? "-");
+    }
+    if (a.kind === "sale") {
+      const s = db.sales.find((x) => x.id === a.saleId);
+      return s ? `${s.id} · ${s.customer}` : (a.saleId ?? "-");
+    }
+    if (a.kind === "invoice") {
+      const s = db.sales.find((x) => x.id === a.saleId);
+      if (s) return `${s.id} · ${s.customer}`;
+      return `Invoice baru · ${a.saleRequest?.customer ?? "-"}`;
+    }
+    if (a.kind === "nota") {
+      const p = db.purchases.find((x) => x.id === a.purchaseId);
+      if (p) return `Nota ${p.nota} · ${p.supplier}`;
+      if (a.purchaseRequest)
+        return `Nota baru ${a.purchaseRequest.nota} · ${a.purchaseRequest.supplier}`;
+      return a.purchaseId ?? "-";
+    }
+    if (a.kind === "notaEdit") {
+      const p = db.purchases.find((x) => x.id === a.purchaseId);
+      return `Revisi nota ${a.purchaseRequest?.nota ?? p?.nota ?? "-"} · ${a.purchaseRequest?.supplier ?? p?.supplier ?? "-"}`;
     }
     return variantLabel(db, a.vid ?? "");
   };
@@ -59,7 +81,7 @@ export function ApprovalsView() {
       label: "Sebelum",
       render: (a) => (
         <span style={{ color: "var(--mu)" }}>
-          <s>{fmt(a, a.before)}</s>
+          {a.kind === "invoice" ? "—" : <s>{fmt(a, a.before)}</s>}
         </span>
       ),
     },
@@ -88,37 +110,64 @@ export function ApprovalsView() {
       label: "",
       noLabel: true,
       align: "right",
-      render: (a) =>
-        a.status === "Menunggu" ? (
-          <div className="flex gap-1 justify-end">
+      render: (a) => (
+        <div className="flex gap-1 justify-end">
+          {(a.kind === "nota" ||
+            a.kind === "notaEdit" ||
+            a.kind === "purchase" ||
+            a.kind === "sale" ||
+            a.kind === "invoice") && (
             <button
               type="button"
-              className="btn s d"
-              onClick={() => {
-                decideApproval(a.id, false);
-                toast("Pengajuan ditolak");
+              className="btn s"
+              onClick={(e) => {
+                e.stopPropagation();
+                setDetailId(a.id);
               }}
             >
-              Tolak
+              Detail
             </button>
-            <button
-              type="button"
-              className="btn s p"
-              onClick={() => {
-                decideApproval(a.id, true);
-                toast(
-                  a.kind === "payment"
-                    ? "Pelunasan disetujui — invoice menjadi Lunas"
-                    : a.kind === "purchase"
-                      ? "Status pembelian disetujui menjadi Lunas"
-                      : "Perubahan disetujui & diterapkan",
-                );
-              }}
-            >
-              Setujui
-            </button>
-          </div>
-        ) : null,
+          )}
+          {a.status === "Menunggu" && (
+            <>
+              <button
+                type="button"
+                className="btn s d"
+                onClick={() => {
+                  decideApproval(a.id, false);
+                  toast("Pengajuan ditolak");
+                }}
+              >
+                Tolak
+              </button>
+              <button
+                type="button"
+                className="btn s p"
+                onClick={() => {
+                  decideApproval(a.id, true);
+                  toast(
+                    a.kind === "invoice"
+                      ? "Invoice disetujui — transaksi tercatat & stok berkurang"
+                      : a.kind === "payment"
+                        ? "Pelunasan disetujui — invoice menjadi Lunas"
+                        : a.kind === "purchase"
+                          ? "Status pembelian disetujui menjadi Lunas"
+                          : a.kind === "notaEdit"
+                            ? "Revisi nota disetujui — stok & harga modal diperbarui"
+                          : a.kind === "nota"
+                            ? "Nota disetujui — harga beli diperbarui"
+                            : a.kind === "sale"
+                              ? "Harga & biaya invoice disetujui"
+                              : "Perubahan disetujui & diterapkan",
+                  );
+                }}
+              >
+                Setujui
+              </button>
+            </>
+          )}
+        </div>
+      ),
     },
   ];
 
@@ -126,7 +175,7 @@ export function ApprovalsView() {
     <>
       <PageHead
         title="Approval & Audit Log"
-        subtitle="Harga, nama varian, pelunasan invoice, dan status pembayaran pembelian tercatat lengkap sebelum & sesudah."
+        subtitle="Invoice penjualan baru, izin belanja nota supplier, harga & biaya invoice, pelunasan, dan perubahan data varian — lengkap sebelum & sesudah, termasuk laba setiap barang."
       />
 
       <div className="tabs mb-4">
@@ -157,6 +206,12 @@ export function ApprovalsView() {
           emptyText="Tidak ada data"
         />
       </div>
+
+      <ApprovalDetailDrawer
+        key={`approval-detail-${detailId ?? "none"}`}
+        approvalId={detailId}
+        onClose={() => setDetailId(null)}
+      />
     </>
   );
 }

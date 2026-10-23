@@ -6,6 +6,7 @@ import { formatDate, TODAY } from "@/lib/date";
 import { rp, initials } from "@/lib/format";
 import {
   arStatus,
+  itemProfit,
   saleCost,
   saleOps,
   salePaid,
@@ -18,6 +19,7 @@ import {
 import { useStore } from "@/lib/store";
 import { Badge } from "@/components/ui/Badge";
 import { Drawer } from "@/components/ui/Drawer";
+import { SaleEditPanel } from "./SaleEditPanel";
 
 const ICONS = {
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>',
@@ -80,10 +82,16 @@ export function SaleDetailDrawer({
   const [payDate, setPayDate] = useState(TODAY);
   const [payAmt, setPayAmt] = useState(0);
   const [payMethod, setPayMethod] = useState("Transfer");
+  const [editOpen, setEditOpen] = useState(false);
 
   const sale = db.sales.find((s) => s.id === saleId) ?? null;
 
   if (!sale) return null;
+
+  /** Ada pengajuan ubah harga & biaya yang menunggu approval Owner? */
+  const pendingRevision = db.approvals.some(
+    (a) => a.kind === "sale" && a.saleId === sale.id && a.status === "Menunggu",
+  );
 
   const rem = saleTotal(sale) - salePaid(sale);
   const proposed = saleProposed(sale);
@@ -114,7 +122,16 @@ export function SaleDetailDrawer({
       title="Detail Penjualan"
       footer={
         <>
-          {rem > 0 && !payOpen && (
+          {!editOpen && !pendingRevision && (
+            <button
+              type="button"
+              className="btn"
+              onClick={() => setEditOpen(true)}
+            >
+              Ubah harga &amp; biaya
+            </button>
+          )}
+          {rem > 0 && !payOpen && !editOpen && (
             <button
               type="button"
               className="btn"
@@ -147,6 +164,19 @@ export function SaleDetailDrawer({
         <Badge tone={status}>{status}</Badge>
       </div>
 
+      {pendingRevision && (
+        <div
+          className="sim"
+          style={{
+            background: "var(--wab)",
+            borderColor: "#f6e4a6",
+            color: "var(--wa)",
+          }}
+        >
+          Pengajuan ubah harga &amp; biaya invoice ini menunggu approval Owner.
+        </div>
+      )}
+
       <div className="sdc">
         <Head icon={ICONS.user} title="Pelanggan" />
         <div className="font-bold">{sale.customer}</div>
@@ -170,6 +200,14 @@ export function SaleDetailDrawer({
                 </div>
                 <div className="text-[12.5px]" style={{ color: "var(--mu)" }}>
                   {i.qty} × {rp(i.price)} · <span>modal {rp(i.cost)}</span>
+                </div>
+                <div
+                  className="text-[12.5px]"
+                  style={{
+                    color: itemProfit(i) >= 0 ? "var(--ok)" : "var(--er)",
+                  }}
+                >
+                  laba {rp(itemProfit(i))}/unit · total {rp(itemProfit(i) * i.qty)}
                 </div>
               </div>
               <div className="font-bold num whitespace-nowrap" style={{ color: "var(--nv)" }}>
@@ -294,6 +332,21 @@ export function SaleDetailDrawer({
           <Row label="− Modal barang" value={rp(saleCost(sale))} />
           <Row label="− Ongkir + packing + lain" value={rp(saleOps(sale))} />
         </div>
+        <div
+          className="mt-2 pt-2 border-t text-[12.5px]"
+          style={{ borderColor: "var(--ln)" }}
+        >
+          {sale.items.map((i) => (
+            <div key={i.vid} className="flex justify-between gap-3 py-0.5">
+              <span style={{ color: "var(--mu)" }}>
+                {variantLabel(db, i.vid)} · {i.qty} × {rp(i.price)}
+              </span>
+              <span className="num whitespace-nowrap">
+                {rp(itemProfit(i))}/unit
+              </span>
+            </div>
+          ))}
+        </div>
         <div className="sdprof">
           <span>Laba order</span>
           <span className="num">{rp(saleProfit(sale))}</span>
@@ -306,6 +359,14 @@ export function SaleDetailDrawer({
           label="Tanggal transaksi"
           value={<b style={{ color: "var(--nv)" }}>{formatDate(sale.date)}</b>}
         />
+        <Row
+          label="Jenis pembayaran"
+          value={
+            <b style={{ color: "var(--nv)" }}>
+              {sale.type === "tempo" ? "Tempo" : "Tunai"}
+            </b>
+          }
+        />
         {sale.type === "tempo" && (
           <Row
             label="Jatuh tempo"
@@ -313,6 +374,10 @@ export function SaleDetailDrawer({
           />
         )}
       </div>
+
+      {editOpen && (
+        <SaleEditPanel sale={sale} onClose={() => setEditOpen(false)} />
+      )}
     </Drawer>
   );
 }

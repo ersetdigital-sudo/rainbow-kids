@@ -10,7 +10,13 @@ import {
 } from "react";
 import { TODAY } from "./date";
 import { uid } from "./format";
-import { priceRange, salePaid, saleProposed, saleTotal } from "./calc";
+import {
+  purchaseTotal,
+  salePaid,
+  saleProfit,
+  saleProposed,
+  saleTotal,
+} from "./calc";
 import {
   getServerSnapshot,
   getSnapshot,
@@ -20,13 +26,18 @@ import {
 } from "./persist";
 import type {
   ApprovalField,
+  CostChange,
   Customer,
   CustomerType,
   DB,
   ModuleKey,
   OpnameLine,
+  PurchaseRequest,
   Role,
   Sale,
+  SaleItem,
+  SaleRequest,
+  SaleRevision,
   Supplier,
 } from "./types";
 
@@ -123,101 +134,139 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   /* ---------------- Penjualan ---------------- */
 
+  /**
+   * Transaksi baru tidak langsung tercatat — invoice diajukan ke Owner.
+   * Penjualan, pengurangan stok, dan riwayat baru berlaku setelah disetujui.
+   */
   const saveSale = useCallback((draft: SaleDraft): Result => {
     const current = getSnapshot();
     if (!draft.customer.trim())
       return { ok: false, msg: "Isi nama pelanggan dulu" };
+    if (!draft.items.length)
+      return { ok: false, msg: "Tambahkan minimal satu barang" };
 
-    // Harga jual harus berada di dalam rentang harga produk.
-    for (const i of draft.items) {
-      const r = priceRange(current, i.vid);
-      if (r && (i.price < r.min || i.price > r.max)) {
-        const v = current.products
-          .flatMap((p) => p.variants)
-          .find((x) => x.id === i.vid);
-        return {
-          ok: false,
-          msg: `Harga ${v?.name ?? "produk"} di luar rentang yang berlaku`,
-        };
-      }
-    }
-
-    const id = `INV-2610-${String(current.sales.length + 1).padStart(4, "0")}`;
-    const items = draft.items.map((i) => {
+    // Harga jual bebas diisi (rentang hanya jadi acuan/histori, tidak memblokir).
+    const items: SaleItem[] = draft.items.map((i) => {
       const v = current.products
         .flatMap((p) => p.variants)
         .find((x) => x.id === i.vid)!;
       return { vid: i.vid, qty: i.qty, price: i.price, cost: v.cost };
     });
-    const sale: Sale = {
-      id,
-      date: draft.date,
+    const request: SaleRequest = {
       customer: draft.customer.trim(),
       customerId: draft.customerId,
+      date: draft.date,
       type: draft.type,
       due: draft.type === "tempo" ? draft.due : null,
       items,
       ship: draft.ship,
       pack: draft.pack,
       other: draft.other,
-      note: "",
-      payments: [],
+      paid: draft.paid,
     };
-    if (sale.type === "tunai")
-      sale.payments.push({
-        date: sale.date,
-        amt: saleTotal(sale),
-        method: "Tunai",
-        status: "Disetujui",
-      });
-    else if (draft.paid > 0)
-      sale.payments.push({
-        date: sale.date,
-        amt: draft.paid,
-        method: "Transfer",
-        status: "Disetujui",
-      });
 
-    // Peringatan stok minus (penjualan tetap dicatat, stok jadi minus).
+    // Peringatan stok minus dipakai sebagai catatan saat Owner meninjau.
     const warnings: string[] = [];
-    for (const item of sale.items) {
+    for (const item of items) {
       const v = current.products
         .flatMap((p) => p.variants)
         .find((x) => x.id === item.vid)!;
       const next = v.stock - item.qty;
       if (next < 0)
         warnings.push(
-          `${v.name} (${current.products.find((p) => p.id === v.id)?.name}): stok ${v.stock} → ${next} (minus, perlu restock)`,
+          `${v.name} (${current.products.find((p) => p.id === v.id)?.name}): stok ${v.stock} → ${next} (minus setelah disetujui)`,
         );
     }
 
+    const time = `${TODAY} ${new Date().toTimeString().slice(0, 5)}`;
     setSnapshot((prev) => ({
       ...prev,
-      sales: [...prev.sales, sale],
-      products: prev.products.map((p) => ({
-        ...p,
-        variants: p.variants.map((v) => {
-          const item = sale.items.find((i) => i.vid === v.id);
-          return item ? { ...v, stock: v.stock - item.qty } : v;
-        }),
-      })),
-      history: [
-        ...prev.history,
-        ...sale.items.map((i) => ({
-          vid: i.vid,
-          date: sale.date,
-          type: "Stok" as const,
-          desc: `Penjualan ${sale.id} −${i.qty}`,
+      approvals: [
+        ...prev.approvals,
+        {
+          id: `AP-${String(prev.approvals.length + 1).padStart(3, "0")}`,
+          kind: "invoice" as const,
+          type: "Invoice penjualan baru",
+          before: 0,
+          after: items.reduce((a, i) => a + i.qty * i.price, 0),
+          saleRequest: request,
           user: prev.user,
-        })),
+          time,
+          status: "Menunggu" as const,
+        },
       ],
     }));
     return {
       ok: true,
-      msg: `Transaksi ${id} tersimpan (simulasi)`,
+      msg: "Invoice diajukan — menunggu approval Owner",
       warnings,
     };
   }, []);
+
+  /**
+   * Pengajuan ubah harga jual per unit / biaya operasional sebuah invoice.
+   * Baru berlaku setelah disetujui Owner.
+   */
+  const requestSaleRevision = useCallback<StoreValue["requestSaleRevision"]>(
+    (saleId, revision) => {
+      const current = getSnapshot();
+      const sale = current.sales.find((s) => s.id === saleId);
+      if (!sale) return { ok: false, msg: "Invoice tidak ditemukan" };
+      if (
+        current.approvals.some(
+          (a) =>
+            a.kind === "sale" && a.saleId === saleId && a.status === "Menunggu",
+        )
+      )
+        return {
+          ok: false,
+          msg: "Sudah ada pengajuan perubahan yang menunggu approval Owner",
+        };
+
+      const sameItems =
+        sale.items.length === revision.items.length &&
+        sale.items.every((it, i) => {
+          const next = revision.items[i];
+          return (
+            next &&
+            next.vid === it.vid &&
+            next.qty === it.qty &&
+            +next.price === +it.price
+          );
+        });
+      const sameOps =
+        +sale.ship === +revision.ship &&
+        +sale.pack === +revision.pack &&
+        +sale.other === +revision.other;
+      if (sameItems && sameOps) return { ok: false, msg: "Tidak ada perubahan" };
+
+      const time = `${TODAY} ${new Date().toTimeString().slice(0, 5)}`;
+      const after = saleProfit({ ...sale, ...revision });
+      setSnapshot((prev) => ({
+        ...prev,
+        approvals: [
+          ...prev.approvals,
+          {
+            id: `AP-${String(prev.approvals.length + 1).padStart(3, "0")}`,
+            kind: "sale" as const,
+            type: "Harga & biaya invoice",
+            saleId,
+            before: saleProfit(sale),
+            after,
+            revision,
+            user: prev.user,
+            time,
+            status: "Menunggu" as const,
+          },
+        ],
+      }));
+      return {
+        ok: true,
+        msg: "Pengajuan perubahan dikirim ke Owner untuk approval",
+      };
+    },
+    [],
+  );
 
   /**
    * Pembayaran sebagian langsung berlaku. Pelunasan (mencakup sisa tagihan)
@@ -409,73 +458,62 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   /* ---------------- Pembelian supplier ---------------- */
 
+  /**
+   * Nota belanja supplier tidak langsung tercatat — diajukan ke Owner.
+   * Pembelian, tambahan stok, dan harga modal baru berlaku setelah disetujui.
+   */
   const savePurchase = useCallback<StoreValue["savePurchase"]>(
     (draft) => {
       const current = getSnapshot();
       if (!draft.supplier.trim() || !draft.nota.trim())
         return { ok: false, msg: "Isi supplier dan no. nota" };
-      const id = `PB-${String(current.purchases.length + 1).padStart(3, "0")}`;
+      if (!draft.items.length)
+        return { ok: false, msg: "Tambahkan minimal satu barang" };
       const time = `${TODAY} ${new Date().toTimeString().slice(0, 5)}`;
 
-      setSnapshot((prev) => {
-        const approvals = [...prev.approvals];
-        for (const item of draft.items) {
-          const product = prev.products.find((p) =>
-            p.variants.some((v) => v.id === item.vid),
-          );
-          const variant = product?.variants.find((v) => v.id === item.vid);
-          if (variant && variant.cost !== item.cost) {
-            approvals.push({
-              id: `AP-${String(approvals.length + 1).padStart(3, "0")}`,
-              kind: "variant" as const,
-              type: "Harga modal",
-              vid: item.vid,
-              field: "cost" as const,
-              before: variant.cost,
-              after: item.cost,
-              user: prev.user,
-              time,
-              status: "Menunggu" as const,
-              ref: id,
-            });
-          }
-        }
-        return {
-          ...prev,
-          approvals,
-          purchases: [
-            ...prev.purchases,
-            {
-              id,
-              nota: draft.nota.trim(),
-              supplier: draft.supplier.trim(),
-              date: draft.date,
-              items: draft.items.map((i) => ({ ...i })),
-              payStatus: "Belum Lunas" as const,
-            },
-          ],
-          products: prev.products.map((p) => ({
-            ...p,
-            variants: p.variants.map((v) => {
-              const item = draft.items.find((i) => i.vid === v.id);
-              return item ? { ...v, stock: v.stock + item.qty } : v;
-            }),
-          })),
-          history: [
-            ...prev.history,
-            ...draft.items.map((i) => ({
-              vid: i.vid,
-              date: draft.date,
-              type: "Stok" as const,
-              desc: `Pembelian ${id} (${draft.nota}) +${i.qty}`,
-              user: prev.user,
-            })),
-          ],
-        };
-      });
+      // Satu nota belanja = satu pengajuan approval (bukan per barang).
+      const costChanges: CostChange[] = [];
+      let beforeTotal = 0;
+      for (const item of draft.items) {
+        const variant = current.products
+          .flatMap((p) => p.variants)
+          .find((v) => v.id === item.vid);
+        beforeTotal += item.qty * (variant?.cost ?? item.cost);
+        if (variant && variant.cost !== item.cost)
+          costChanges.push({
+            vid: item.vid,
+            before: variant.cost,
+            after: item.cost,
+          });
+      }
+      const request: PurchaseRequest = {
+        supplier: draft.supplier.trim(),
+        nota: draft.nota.trim(),
+        date: draft.date,
+        items: draft.items.map((i) => ({ ...i })),
+      };
+
+      setSnapshot((prev) => ({
+        ...prev,
+        approvals: [
+          ...prev.approvals,
+          {
+            id: `AP-${String(prev.approvals.length + 1).padStart(3, "0")}`,
+            kind: "nota" as const,
+            type: "Izin belanja nota",
+            before: beforeTotal,
+            after: request.items.reduce((a, i) => a + i.qty * i.cost, 0),
+            costChanges,
+            purchaseRequest: request,
+            user: prev.user,
+            time,
+            status: "Menunggu" as const,
+          },
+        ],
+      }));
       return {
         ok: true,
-        msg: `Pembelian ${id} tersimpan, stok bertambah`,
+        msg: "Nota belanja diajukan — menunggu approval Owner",
       };
     },
     [],
@@ -514,6 +552,80 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         ],
       }));
       return { ok: true, msg: "Pengajuan pelunasan dikirim ke Owner" };
+    },
+    [],
+  );
+
+  /**
+   * Pengajuan revisi satu nota belanja (tanggal, no. nota, supplier, qty/harga
+   * barang). Stok dan harga modal baru menyesuaikan setelah disetujui Owner.
+   */
+  const revisePurchase = useCallback<StoreValue["revisePurchase"]>(
+    (purchaseId, draft) => {
+      const current = getSnapshot();
+      const p = current.purchases.find((x) => x.id === purchaseId);
+      if (!p) return { ok: false, msg: "Pembelian tidak ditemukan" };
+      if (!draft.supplier.trim() || !draft.nota.trim())
+        return { ok: false, msg: "Isi supplier dan no. nota" };
+      if (!draft.items.length)
+        return { ok: false, msg: "Tambahkan minimal satu barang" };
+      if (
+        current.approvals.some(
+          (a) =>
+            a.kind === "notaEdit" &&
+            a.purchaseId === purchaseId &&
+            a.status === "Menunggu",
+        )
+      )
+        return {
+          ok: false,
+          msg: "Sudah ada pengajuan revisi yang menunggu approval Owner",
+        };
+
+      const sameHead =
+        p.supplier === draft.supplier.trim() &&
+        p.nota === draft.nota.trim() &&
+        p.date === draft.date;
+      const sameItems =
+        p.items.length === draft.items.length &&
+        p.items.every((it, i) => {
+          const next = draft.items[i];
+          return (
+            next &&
+            next.vid === it.vid &&
+            next.qty === it.qty &&
+            +next.cost === +it.cost
+          );
+        });
+      if (sameHead && sameItems) return { ok: false, msg: "Tidak ada perubahan" };
+
+      const time = `${TODAY} ${new Date().toTimeString().slice(0, 5)}`;
+      const request: PurchaseRequest = {
+        supplier: draft.supplier.trim(),
+        nota: draft.nota.trim(),
+        date: draft.date,
+        items: draft.items.map((i) => ({ ...i })),
+      };
+      setSnapshot((prev) => ({
+        ...prev,
+        approvals: [
+          ...prev.approvals,
+          {
+            id: `AP-${String(prev.approvals.length + 1).padStart(3, "0")}`,
+            kind: "notaEdit" as const,
+            type: "Revisi nota belanja",
+            purchaseId,
+            before: purchaseTotal(p),
+            after: request.items.reduce((a, i) => a + i.qty * i.cost, 0),
+            purchaseRequest: request,
+            user: prev.user,
+            time,
+            status: "Menunggu" as const,
+            ref: purchaseId,
+          },
+        ],
+      }));
+      return { ok: true, msg: "Revisi nota diajukan — menunggu approval Owner" };
     },
     [],
   );
@@ -616,6 +728,82 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const a = prev.approvals.find((x) => x.id === id);
       if (!a) return prev;
 
+      // 0. Invoice penjualan baru — transaksi & stok baru berlaku setelah disetujui
+      if (a.kind === "invoice") {
+        const req = a.saleRequest;
+        if (!ok || !req)
+          return {
+            ...prev,
+            approvals: prev.approvals.map((x) =>
+              x.id === id
+                ? { ...x, status: ok ? "Disetujui" : "Ditolak", by: prev.user }
+                : x,
+            ),
+          };
+
+        const saleId = `INV-2610-${String(prev.sales.length + 1).padStart(4, "0")}`;
+        const sale: Sale = {
+          id: saleId,
+          date: req.date,
+          customer: req.customer,
+          customerId: req.customerId,
+          type: req.type,
+          due: req.type === "tempo" ? req.due : null,
+          items: req.items.map((i) => ({ ...i })),
+          ship: req.ship,
+          pack: req.pack,
+          other: req.other,
+          note: "",
+          payments: [],
+        };
+        if (sale.type === "tunai")
+          sale.payments.push({
+            date: sale.date,
+            amt: saleTotal(sale),
+            method: "Tunai",
+            status: "Disetujui",
+          });
+        else if (req.paid > 0)
+          sale.payments.push({
+            date: sale.date,
+            amt: req.paid,
+            method: "Transfer",
+            status: "Disetujui",
+          });
+
+        return {
+          ...prev,
+          sales: [...prev.sales, sale],
+          products: prev.products.map((p) => ({
+            ...p,
+            variants: p.variants.map((v) => {
+              const item = sale.items.find((i) => i.vid === v.id);
+              return item ? { ...v, stock: v.stock - item.qty } : v;
+            }),
+          })),
+          history: [
+            ...prev.history,
+            ...sale.items.map((i) => ({
+              vid: i.vid,
+              date: sale.date,
+              type: "Stok" as const,
+              desc: `Penjualan ${sale.id} −${i.qty}`,
+              user: prev.user,
+            })),
+          ],
+          approvals: prev.approvals.map((x) =>
+            x.id === id
+              ? {
+                  ...x,
+                  status: "Disetujui" as const,
+                  by: prev.user,
+                  saleId,
+                }
+              : x,
+          ),
+        };
+      }
+
       // 1. Pelunasan invoice
       if (a.kind === "payment") {
         return {
@@ -657,7 +845,217 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
-      // 3. Ubah data varian / rentang harga produk
+      // 3. Harga & biaya invoice (penjualan)
+      if (a.kind === "sale") {
+        const history = [...prev.history];
+        const sales = prev.sales.map((s) => {
+          if (s.id !== a.saleId || !ok || !a.revision) return s;
+          a.revision.items.forEach((item, idx) => {
+            const before = s.items[idx];
+            if (before && before.price !== item.price)
+              history.push({
+                vid: item.vid,
+                date: TODAY,
+                type: "Harga" as const,
+                desc: `Harga jual ${s.id}: Rp ${Number(before.price).toLocaleString("id-ID")} → Rp ${Number(item.price).toLocaleString("id-ID")}`,
+                user: prev.user,
+              });
+          });
+          return { ...s, ...a.revision };
+        });
+        return {
+          ...prev,
+          sales,
+          history,
+          approvals: prev.approvals.map((x) =>
+            x.id === id
+              ? { ...x, status: ok ? "Disetujui" : "Ditolak", by: prev.user }
+              : x,
+          ),
+        };
+      }
+
+      // 4. Izin belanja satu nota supplier (nota baru + harga beli baru)
+      if (a.kind === "nota") {
+        const history = [...prev.history];
+        const req = a.purchaseRequest;
+
+        // 4a. Nota baru — pembelian & tambahan stok baru tercatat setelah disetujui.
+        if (req) {
+          if (!ok)
+            return {
+              ...prev,
+              approvals: prev.approvals.map((x) =>
+                x.id === id
+                  ? { ...x, status: "Ditolak" as const, by: prev.user }
+                  : x,
+              ),
+            };
+
+          const purchaseId = `PB-${String(prev.purchases.length + 1).padStart(3, "0")}`;
+          const products = prev.products.map((p) => ({
+            ...p,
+            variants: p.variants.map((v) => {
+              const item = req.items.find((i) => i.vid === v.id);
+              const change = (a.costChanges ?? []).find((c) => c.vid === v.id);
+              if (!item && !change) return v;
+              if (change)
+                history.push({
+                  vid: v.id,
+                  date: TODAY,
+                  type: "Harga" as const,
+                  desc: `Harga modal (nota ${req.nota}): Rp ${Number(change.before).toLocaleString("id-ID")} → Rp ${Number(change.after).toLocaleString("id-ID")}`,
+                  user: prev.user,
+                });
+              return {
+                ...v,
+                stock: item ? v.stock + item.qty : v.stock,
+                cost: change ? change.after : v.cost,
+              };
+            }),
+          }));
+
+          return {
+            ...prev,
+            products,
+            purchases: [
+              ...prev.purchases,
+              {
+                id: purchaseId,
+                nota: req.nota,
+                supplier: req.supplier,
+                date: req.date,
+                items: req.items.map((i) => ({ ...i })),
+                payStatus: "Belum Lunas" as const,
+              },
+            ],
+            history: [
+              ...history,
+              ...req.items.map((i) => ({
+                vid: i.vid,
+                date: req.date,
+                type: "Stok" as const,
+                desc: `Pembelian ${purchaseId} (${req.nota}) +${i.qty}`,
+                user: prev.user,
+              })),
+            ],
+            approvals: prev.approvals.map((x) =>
+              x.id === id
+                ? {
+                    ...x,
+                    status: "Disetujui" as const,
+                    by: prev.user,
+                    purchaseId,
+                  }
+                : x,
+            ),
+          };
+        }
+
+        // 4b. Nota lama — hanya harga beli yang diperbarui.
+        const products = ok
+          ? prev.products.map((p) => ({
+              ...p,
+              variants: p.variants.map((v) => {
+                const change = (a.costChanges ?? []).find((c) => c.vid === v.id);
+                if (!change) return v;
+                history.push({
+                  vid: v.id,
+                  date: TODAY,
+                  type: "Harga" as const,
+                  desc: `Harga modal (nota ${a.purchaseId}): Rp ${Number(change.before).toLocaleString("id-ID")} → Rp ${Number(change.after).toLocaleString("id-ID")}`,
+                  user: prev.user,
+                });
+                return { ...v, cost: change.after };
+              }),
+            }))
+          : prev.products;
+        return {
+          ...prev,
+          products,
+          history,
+          approvals: prev.approvals.map((x) =>
+            x.id === id
+              ? { ...x, status: ok ? "Disetujui" : "Ditolak", by: prev.user }
+              : x,
+          ),
+        };
+      }
+
+      // 4c. Revisi nota belanja yang sudah tercatat — nota, stok, & modal baru
+      if (a.kind === "notaEdit") {
+        const history = [...prev.history];
+        const req = a.purchaseRequest;
+        const purchase = prev.purchases.find((x) => x.id === a.purchaseId);
+        if (!ok || !req || !purchase)
+          return {
+            ...prev,
+            approvals: prev.approvals.map((x) =>
+              x.id === id
+                ? { ...x, status: ok ? "Disetujui" : "Ditolak", by: prev.user }
+                : x,
+            ),
+          };
+
+        const vids = new Set([
+          ...purchase.items.map((i) => i.vid),
+          ...req.items.map((i) => i.vid),
+        ]);
+        const products = prev.products.map((p) => ({
+          ...p,
+          variants: p.variants.map((v) => {
+            if (!vids.has(v.id)) return v;
+            const before = purchase.items.find((i) => i.vid === v.id);
+            const after = req.items.find((i) => i.vid === v.id);
+            const delta = (after?.qty ?? 0) - (before?.qty ?? 0);
+            if (delta !== 0)
+              history.push({
+                vid: v.id,
+                date: TODAY,
+                type: "Stok" as const,
+                desc: `Revisi nota ${req.nota}: ${delta > 0 ? "+" : ""}${delta}`,
+                user: prev.user,
+              });
+            if (after && +after.cost !== +v.cost)
+              history.push({
+                vid: v.id,
+                date: TODAY,
+                type: "Harga" as const,
+                desc: `Harga modal (revisi nota ${req.nota}): Rp ${Number(v.cost).toLocaleString("id-ID")} → Rp ${Number(after.cost).toLocaleString("id-ID")}`,
+                user: prev.user,
+              });
+            return {
+              ...v,
+              stock: v.stock + delta,
+              cost: after ? +after.cost : v.cost,
+            };
+          }),
+        }));
+
+        return {
+          ...prev,
+          products,
+          history,
+          purchases: prev.purchases.map((x) =>
+            x.id === purchase.id
+              ? {
+                  ...x,
+                  nota: req.nota,
+                  supplier: req.supplier,
+                  date: req.date,
+                  items: req.items.map((i) => ({ ...i })),
+                }
+              : x,
+          ),
+          approvals: prev.approvals.map((x) =>
+            x.id === id
+              ? { ...x, status: "Disetujui" as const, by: prev.user }
+              : x,
+          ),
+        };
+      }
+
+      // 5. Ubah data varian / rentang harga produk
       const history = [...prev.history];
       const products = prev.products.map((p) => {
         const variant = p.variants.find((v) => v.id === a.vid);
@@ -769,11 +1167,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       addCustomer,
       addSupplier,
       saveSale,
+      requestSaleRevision,
       recordPayment,
       addProduct,
       submitChange,
       savePurchase,
       requestPurchaseLunas,
+      revisePurchase,
       startOpname,
       updateOpnameLine,
       submitOpname,
@@ -791,11 +1191,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       addCustomer,
       addSupplier,
       saveSale,
+      requestSaleRevision,
       recordPayment,
       addProduct,
       submitChange,
       savePurchase,
       requestPurchaseLunas,
+      revisePurchase,
       startOpname,
       updateOpnameLine,
       submitOpname,
@@ -835,6 +1237,7 @@ type StoreValue = {
   }) => Result;
   addSupplier: (s: { name: string; phone?: string; address?: string }) => Result;
   saveSale: (draft: SaleDraft) => Result;
+  requestSaleRevision: (saleId: string, revision: SaleRevision) => Result;
   recordPayment: (
     saleId: string,
     p: { date: string; amt: number; method: string },
@@ -857,6 +1260,7 @@ type StoreValue = {
   ) => Result;
   savePurchase: (draft: PurchaseDraft) => Result;
   requestPurchaseLunas: (purchaseId: string) => Result;
+  revisePurchase: (purchaseId: string, draft: PurchaseDraft) => Result;
   startOpname: () => string;
   updateOpnameLine: (
     id: string,

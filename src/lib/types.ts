@@ -113,11 +113,60 @@ export type HistoryEntry = {
 
 export type ApprovalField = "name" | "cost" | "price" | "minPrice" | "maxPrice";
 
-export type ApprovalKind = "variant" | "payment" | "purchase";
+export type ApprovalKind =
+  | "variant"
+  | "payment"
+  | "purchase"
+  | "sale"
+  | "nota"
+  | "notaEdit"
+  | "invoice";
+
+/** Usulan invoice penjualan baru — baru tercatat setelah disetujui Owner. */
+export type SaleRequest = {
+  customer: string;
+  customerId?: string;
+  date: string;
+  type: SaleType;
+  due: string | null;
+  items: SaleItem[];
+  ship: number;
+  pack: number;
+  other: number;
+  paid: number;
+};
+
+/** Usulan perubahan harga jual / biaya sebuah invoice. */
+export type SaleRevision = {
+  items: SaleItem[];
+  ship: number;
+  pack: number;
+  other: number;
+};
+
+/** Usulan nota belanja supplier — baru tercatat setelah disetujui Owner. */
+export type PurchaseRequest = {
+  supplier: string;
+  nota: string;
+  date: string;
+  items: PurchaseItem[];
+};
+
+/** Selisih harga beli sebuah barang pada nota pembelian. */
+export type CostChange = {
+  vid: string;
+  before: number;
+  after: number;
+};
 
 export type Approval = {
   id: string;
-  /** variant = ubah data varian/produk, payment = pelunasan invoice, purchase = status bayar pembelian */
+  /**
+   * variant = ubah data varian/produk, payment = pelunasan invoice,
+   * purchase = status bayar pembelian, sale = harga & biaya invoice,
+   * nota = izin belanja satu nota supplier,
+   * notaEdit = revisi satu nota belanja yang sudah tercatat.
+   */
   kind: ApprovalKind;
   type: string;
   vid?: string;
@@ -126,6 +175,14 @@ export type Approval = {
   after: string | number;
   saleId?: string;
   purchaseId?: string;
+  /** Rincian usulan untuk kind "sale". */
+  revision?: SaleRevision;
+  /** Rincian invoice baru untuk kind "invoice". */
+  saleRequest?: SaleRequest;
+  /** Perubahan harga beli untuk kind "nota". */
+  costChanges?: CostChange[];
+  /** Rincian nota baru untuk kind "nota" (izin belanja). */
+  purchaseRequest?: PurchaseRequest;
   user: string;
   time: string;
   status: "Menunggu" | "Disetujui" | "Ditolak";

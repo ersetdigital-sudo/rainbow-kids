@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { formatDate } from "@/lib/date";
 import { rp } from "@/lib/format";
 import {
   arStatus,
+  itemProfit,
   saleCost,
   saleOps,
   salePaid,
@@ -21,6 +22,24 @@ export function InvoiceView({ invoiceId }: { invoiceId?: string }) {
   const { db } = useStore();
   const fallback = db.sales[db.sales.length - 1]?.id ?? "";
   const [selected, setSelected] = useState(invoiceId ?? fallback);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  /** Skala lembar A4 mengikuti lebar layar supaya selalu tampil utuh (210mm = 794px). */
+  const [zoom, setZoom] = useState(1);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const fit = () => {
+      const cs = getComputedStyle(el);
+      const avail =
+        el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      setZoom(Math.min(1, Math.max(0.3, avail / 794)));
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const sale = db.sales.find((s) => s.id === selected) ?? db.sales[db.sales.length - 1];
   if (!sale) {
@@ -69,8 +88,8 @@ export function InvoiceView({ invoiceId }: { invoiceId?: string }) {
         }
       />
 
-      <div className="invwrap">
-        <div className="a4">
+      <div className="invwrap" ref={wrapRef}>
+        <div className="a4" style={{ zoom }}>
           <div
             style={{
               display: "flex",
@@ -355,6 +374,36 @@ export function InvoiceView({ invoiceId }: { invoiceId?: string }) {
               <span className="num">{rp(saleProfit(sale))}</span>
             </div>
           </div>
+        </div>
+
+        <div className="mt-4">
+          <div
+            className="text-[12px] font-bold uppercase tracking-wide mb-1"
+            style={{ color: "var(--mu)" }}
+          >
+            Laba per barang (per unit)
+          </div>
+          {sale.items.map((i) => (
+            <div
+              key={i.vid}
+              className="flex flex-wrap justify-between gap-x-3 gap-y-1 text-[13px] py-1 border-b"
+              style={{ borderColor: "#F0F1F6" }}
+            >
+              <span className="font-semibold" style={{ color: "var(--nv)" }}>
+                {variantLabel(db, i.vid)}
+              </span>
+              <span className="num" style={{ color: "var(--mu)" }}>
+                {i.qty} × {rp(i.price)} · modal {rp(i.cost)}/unit
+              </span>
+              <span
+                className="num"
+                style={{ color: itemProfit(i) >= 0 ? "var(--ok)" : "var(--er)" }}
+              >
+                laba {rp(itemProfit(i))}/unit · total{" "}
+                {rp(itemProfit(i) * i.qty)}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
     </>

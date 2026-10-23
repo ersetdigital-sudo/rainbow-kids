@@ -9,9 +9,11 @@ import { Icon } from "@/components/ui/Icon";
 export function Sidebar({
   open,
   onClose,
+  collapsed = false,
 }: {
   open: boolean;
   onClose: () => void;
+  collapsed?: boolean;
 }) {
   const pathname = usePathname();
   const { db, resetDemo } = useStore();
@@ -21,12 +23,13 @@ export function Sidebar({
     href === "/" ? pathname === "/" : pathname.startsWith(href);
 
   return (
-    <aside id="side" className={`side ${open ? "open" : ""}`}>
-      <div className="flex items-center gap-3 px-5 h-16 border-b" style={{ borderColor: "rgba(255,255,255,.08)" }}>
-        <div
-          className="w-9 h-9 rounded-xl grid place-items-center flex-none"
-          style={{ background: "#FEC40B" }}
-        >
+    <aside
+      id="side"
+      aria-label="Navigasi utama"
+      className={`side${open ? " open" : ""}${collapsed ? " collapsed" : ""}`}
+    >
+      <div className="side-hd">
+        <div className="side-lg">
           <svg
             width="24"
             height="24"
@@ -41,11 +44,9 @@ export function Sidebar({
             <path d="M10 17a2 2 0 0 1 4 0" stroke="#04123F" opacity=".45" />
           </svg>
         </div>
-        <div className="leading-tight">
-          <div className="font-bold text-[14px]">{db.biz.name}</div>
-          <div className="text-[11px]" style={{ color: "rgba(255,255,255,.5)" }}>
-            Business Suite
-          </div>
+        <div className="side-brand">
+          <div className="side-nm">{db.biz.name}</div>
+          <div className="side-sub">Kasir &amp; Inventory</div>
         </div>
       </div>
 
@@ -62,11 +63,12 @@ export function Sidebar({
                   key={item.href}
                   href={item.href}
                   onClick={onClose}
+                  title={item.label}
                   className={isActive(item.href) ? "on" : undefined}
                   aria-current={isActive(item.href) ? "page" : undefined}
                 >
                   <Icon name={item.icon} />
-                  <span className="flex-1">{item.label}</span>
+                  <span className="navl flex-1">{item.label}</span>
                   {item.href === "/approvals" && pending > 0 && (
                     <span className="npill">{pending}</span>
                   )}
@@ -77,14 +79,11 @@ export function Sidebar({
         )}
       </nav>
 
-      <div
-        className="px-4 py-3 border-t text-[11px] flex justify-between items-center"
-        style={{ color: "rgba(255,255,255,.45)", borderColor: "rgba(255,255,255,.08)" }}
-      >
-        <span>Prototipe · data dummy</span>
+      <div className="side-ft">
+        <div className="side-note">Mode demo · data tersimpan di browser</div>
         <button
           type="button"
-          className="underline"
+          className="side-reset"
           onClick={() => {
             if (window.confirm("Kembalikan semua data simulasi ke kondisi awal?")) {
               resetDemo();

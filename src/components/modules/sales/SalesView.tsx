@@ -57,7 +57,8 @@ export function SalesView() {
       `penjualan-rainbow-kids-${stamp()}`,
       [
         "No. Invoice",
-        "Tanggal",
+        "Tanggal order",
+        "Jatuh tempo",
         "Pelanggan",
         "Jenis",
         "Total",
@@ -71,6 +72,7 @@ export function SalesView() {
       list.map((s) => [
         s.id,
         formatDate(s.date),
+        s.due ? formatDate(s.due) : "-",
         s.customer,
         s.type === "tempo" ? "Tempo" : "Tunai",
         rp(saleTotal(s)),
@@ -92,50 +94,17 @@ export function SalesView() {
       render: (s) => <span className="font-semibold">{s.id}</span>,
     },
     { key: "date", label: "Tanggal", render: (s) => formatDate(s.date) },
-    { key: "customer", label: "Pelanggan", render: (s) => s.customer },
     {
-      key: "type",
-      label: "Jenis",
-      render: (s) => (s.type === "tempo" ? "Tempo" : "Tunai"),
+      key: "customer",
+      label: "Pelanggan",
+      cellClass: "h-wrap",
+      render: (s) => s.customer,
     },
     {
       key: "total",
       label: "Total jual",
       align: "right",
       render: (s) => <span className="num">{rp(saleTotal(s))}</span>,
-    },
-    {
-      key: "cost",
-      label: "Modal",
-      align: "right",
-      render: (s) => (
-        <span className="num" style={{ color: "var(--mu)" }}>
-          {rp(saleCost(s))}
-        </span>
-      ),
-    },
-    {
-      key: "ops",
-      label: "Biaya ops",
-      align: "right",
-      render: (s) => (
-        <span className="num" style={{ color: "var(--mu)" }}>
-          {rp(saleOps(s))}
-        </span>
-      ),
-    },
-    {
-      key: "profit",
-      label: "Laba",
-      align: "right",
-      render: (s) => (
-        <span
-          className="num font-semibold"
-          style={{ color: saleProfit(s) >= 0 ? "var(--ok)" : "var(--er)" }}
-        >
-          {rp(saleProfit(s))}
-        </span>
-      ),
     },
     {
       key: "status",

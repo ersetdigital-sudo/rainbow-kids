@@ -83,7 +83,7 @@ export function PurchasesView() {
     <>
       <PageHead
         title="Pembelian Supplier"
-        subtitle="Catat pembelian sesuai nota/struk. Stok bertambah otomatis dan bisa ditelusuri saat stok opname."
+        subtitle="Catat pembelian sesuai nota/struk. Nota diajukan ke Owner — stok dan harga modal baru bertambah setelah disetujui."
         actions={
           <button type="button" className="btn p" onClick={() => setFormOpen(true)}>
             + Catat pembelian
