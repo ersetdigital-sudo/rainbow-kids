@@ -53,6 +53,10 @@ export function ApprovalsView() {
         return `Nota baru ${a.purchaseRequest.nota} · ${a.purchaseRequest.supplier}`;
       return a.purchaseId ?? "-";
     }
+    if (a.kind === "notaEdit") {
+      const p = db.purchases.find((x) => x.id === a.purchaseId);
+      return `Revisi nota ${a.purchaseRequest?.nota ?? p?.nota ?? "-"} · ${a.purchaseRequest?.supplier ?? p?.supplier ?? "-"}`;
+    }
     return variantLabel(db, a.vid ?? "");
   };
 
@@ -109,6 +113,8 @@ export function ApprovalsView() {
       render: (a) => (
         <div className="flex gap-1 justify-end">
           {(a.kind === "nota" ||
+            a.kind === "notaEdit" ||
+            a.kind === "purchase" ||
             a.kind === "sale" ||
             a.kind === "invoice") && (
             <button
@@ -146,6 +152,8 @@ export function ApprovalsView() {
                         ? "Pelunasan disetujui — invoice menjadi Lunas"
                         : a.kind === "purchase"
                           ? "Status pembelian disetujui menjadi Lunas"
+                          : a.kind === "notaEdit"
+                            ? "Revisi nota disetujui — stok & harga modal diperbarui"
                           : a.kind === "nota"
                             ? "Nota disetujui — harga beli diperbarui"
                             : a.kind === "sale"

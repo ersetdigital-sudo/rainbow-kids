@@ -1,4 +1,5 @@
 export type IconName =
+  | "hist"
   | "dash"
   | "sales"
   | "stock"
@@ -11,6 +12,7 @@ export type IconName =
   | "users";
 
 export const ICONS: Record<IconName, string> = {
+  hist: '<path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/>',
   dash: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
   sales: '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0"/>',
   stock: '<path d="m7.5 4.27 9 5.15M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.3 7 12 12l8.7-5M12 22V12"/>',
@@ -48,6 +50,7 @@ export const NAV: NavGroup[] = [
   {
     items: [
       { href: "/reports", label: "Laporan", icon: "report" },
+      { href: "/history", label: "Histori", icon: "hist" },
       { href: "/approvals", label: "Approval & Audit", icon: "approval" },
       { href: "/users", label: "Pengguna & Akses", icon: "users" },
     ],

@@ -10,7 +10,13 @@ import {
 } from "react";
 import { TODAY } from "./date";
 import { uid } from "./format";
-import { salePaid, saleProfit, saleProposed, saleTotal } from "./calc";
+import {
+  purchaseTotal,
+  salePaid,
+  saleProfit,
+  saleProposed,
+  saleTotal,
+} from "./calc";
 import {
   getServerSnapshot,
   getSnapshot,
@@ -550,6 +556,80 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  /**
+   * Pengajuan revisi satu nota belanja (tanggal, no. nota, supplier, qty/harga
+   * barang). Stok dan harga modal baru menyesuaikan setelah disetujui Owner.
+   */
+  const revisePurchase = useCallback<StoreValue["revisePurchase"]>(
+    (purchaseId, draft) => {
+      const current = getSnapshot();
+      const p = current.purchases.find((x) => x.id === purchaseId);
+      if (!p) return { ok: false, msg: "Pembelian tidak ditemukan" };
+      if (!draft.supplier.trim() || !draft.nota.trim())
+        return { ok: false, msg: "Isi supplier dan no. nota" };
+      if (!draft.items.length)
+        return { ok: false, msg: "Tambahkan minimal satu barang" };
+      if (
+        current.approvals.some(
+          (a) =>
+            a.kind === "notaEdit" &&
+            a.purchaseId === purchaseId &&
+            a.status === "Menunggu",
+        )
+      )
+        return {
+          ok: false,
+          msg: "Sudah ada pengajuan revisi yang menunggu approval Owner",
+        };
+
+      const sameHead =
+        p.supplier === draft.supplier.trim() &&
+        p.nota === draft.nota.trim() &&
+        p.date === draft.date;
+      const sameItems =
+        p.items.length === draft.items.length &&
+        p.items.every((it, i) => {
+          const next = draft.items[i];
+          return (
+            next &&
+            next.vid === it.vid &&
+            next.qty === it.qty &&
+            +next.cost === +it.cost
+          );
+        });
+      if (sameHead && sameItems) return { ok: false, msg: "Tidak ada perubahan" };
+
+      const time = `${TODAY} ${new Date().toTimeString().slice(0, 5)}`;
+      const request: PurchaseRequest = {
+        supplier: draft.supplier.trim(),
+        nota: draft.nota.trim(),
+        date: draft.date,
+        items: draft.items.map((i) => ({ ...i })),
+      };
+      setSnapshot((prev) => ({
+        ...prev,
+        approvals: [
+          ...prev.approvals,
+          {
+            id: `AP-${String(prev.approvals.length + 1).padStart(3, "0")}`,
+            kind: "notaEdit" as const,
+            type: "Revisi nota belanja",
+            purchaseId,
+            before: purchaseTotal(p),
+            after: request.items.reduce((a, i) => a + i.qty * i.cost, 0),
+            purchaseRequest: request,
+            user: prev.user,
+            time,
+            status: "Menunggu" as const,
+            ref: purchaseId,
+          },
+        ],
+      }));
+      return { ok: true, msg: "Revisi nota diajukan — menunggu approval Owner" };
+    },
+    [],
+  );
+
   /* ---------------- Stok opname ---------------- */
 
   const startOpname = useCallback(() => {
@@ -902,6 +982,79 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
+      // 4c. Revisi nota belanja yang sudah tercatat — nota, stok, & modal baru
+      if (a.kind === "notaEdit") {
+        const history = [...prev.history];
+        const req = a.purchaseRequest;
+        const purchase = prev.purchases.find((x) => x.id === a.purchaseId);
+        if (!ok || !req || !purchase)
+          return {
+            ...prev,
+            approvals: prev.approvals.map((x) =>
+              x.id === id
+                ? { ...x, status: ok ? "Disetujui" : "Ditolak", by: prev.user }
+                : x,
+            ),
+          };
+
+        const vids = new Set([
+          ...purchase.items.map((i) => i.vid),
+          ...req.items.map((i) => i.vid),
+        ]);
+        const products = prev.products.map((p) => ({
+          ...p,
+          variants: p.variants.map((v) => {
+            if (!vids.has(v.id)) return v;
+            const before = purchase.items.find((i) => i.vid === v.id);
+            const after = req.items.find((i) => i.vid === v.id);
+            const delta = (after?.qty ?? 0) - (before?.qty ?? 0);
+            if (delta !== 0)
+              history.push({
+                vid: v.id,
+                date: TODAY,
+                type: "Stok" as const,
+                desc: `Revisi nota ${req.nota}: ${delta > 0 ? "+" : ""}${delta}`,
+                user: prev.user,
+              });
+            if (after && +after.cost !== +v.cost)
+              history.push({
+                vid: v.id,
+                date: TODAY,
+                type: "Harga" as const,
+                desc: `Harga modal (revisi nota ${req.nota}): Rp ${Number(v.cost).toLocaleString("id-ID")} → Rp ${Number(after.cost).toLocaleString("id-ID")}`,
+                user: prev.user,
+              });
+            return {
+              ...v,
+              stock: v.stock + delta,
+              cost: after ? +after.cost : v.cost,
+            };
+          }),
+        }));
+
+        return {
+          ...prev,
+          products,
+          history,
+          purchases: prev.purchases.map((x) =>
+            x.id === purchase.id
+              ? {
+                  ...x,
+                  nota: req.nota,
+                  supplier: req.supplier,
+                  date: req.date,
+                  items: req.items.map((i) => ({ ...i })),
+                }
+              : x,
+          ),
+          approvals: prev.approvals.map((x) =>
+            x.id === id
+              ? { ...x, status: "Disetujui" as const, by: prev.user }
+              : x,
+          ),
+        };
+      }
+
       // 5. Ubah data varian / rentang harga produk
       const history = [...prev.history];
       const products = prev.products.map((p) => {
@@ -1020,6 +1173,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       submitChange,
       savePurchase,
       requestPurchaseLunas,
+      revisePurchase,
       startOpname,
       updateOpnameLine,
       submitOpname,
@@ -1043,6 +1197,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       submitChange,
       savePurchase,
       requestPurchaseLunas,
+      revisePurchase,
       startOpname,
       updateOpnameLine,
       submitOpname,
@@ -1105,6 +1260,7 @@ type StoreValue = {
   ) => Result;
   savePurchase: (draft: PurchaseDraft) => Result;
   requestPurchaseLunas: (purchaseId: string) => Result;
+  revisePurchase: (purchaseId: string, draft: PurchaseDraft) => Result;
   startOpname: () => string;
   updateOpnameLine: (
     id: string,

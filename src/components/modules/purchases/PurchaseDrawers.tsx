@@ -5,6 +5,7 @@ import { formatDate, TODAY } from "@/lib/date";
 import { rp, initials } from "@/lib/format";
 import { lastPurchaseOf, purchaseTotal, variantLabel } from "@/lib/calc";
 import { useStore, type PurchaseDraft } from "@/lib/store";
+import type { Purchase } from "@/lib/types";
 import { Badge } from "@/components/ui/Badge";
 import { Drawer } from "@/components/ui/Drawer";
 import { Picker } from "@/components/ui/Picker";
@@ -13,11 +14,14 @@ import { Picker } from "@/components/ui/Picker";
 export function PurchaseFormDrawer({
   open,
   onClose,
+  purchase,
 }: {
   open: boolean;
   onClose: () => void;
+  /** Diisi = mode ubah nota yang sudah tercatat; kosong = catat nota baru. */
+  purchase?: Purchase | null;
 }) {
-  const { db, savePurchase, addSupplier, toast } = useStore();
+  const { db, savePurchase, revisePurchase, addSupplier, toast } = useStore();
   const variants = useMemo(
     () =>
       db.products.flatMap((p) =>
@@ -28,14 +32,23 @@ export function PurchaseFormDrawer({
   const [pickerOpen, setPickerOpen] = useState(false);
 
   // State di-reset lewat remount (parent memberi key berbeda tiap dibuka).
-  const [draft, setDraft] = useState<PurchaseDraft>(() => ({
-    supplier: "",
-    nota: "",
-    date: TODAY,
-    items: variants[0]
-      ? [{ vid: variants[0].id, qty: 10, cost: variants[0].cost }]
-      : [],
-  }));
+  const [draft, setDraft] = useState<PurchaseDraft>(() =>
+    purchase
+      ? {
+          supplier: purchase.supplier,
+          nota: purchase.nota,
+          date: purchase.date,
+          items: purchase.items.map((i) => ({ ...i })),
+        }
+      : {
+          supplier: "",
+          nota: "",
+          date: TODAY,
+          items: variants[0]
+            ? [{ vid: variants[0].id, qty: 10, cost: variants[0].cost }]
+            : [],
+        },
+  );
 
   const total = draft.items.reduce((a, i) => a + i.qty * i.cost, 0);
   const diff = draft.items.filter((i) => {
@@ -53,7 +66,7 @@ export function PurchaseFormDrawer({
     }));
 
   const submit = () => {
-    const res = savePurchase(draft);
+    const res = purchase ? revisePurchase(purchase.id, draft) : savePurchase(draft);
     toast(res.msg);
     if (res.ok) onClose();
   };
@@ -63,22 +76,32 @@ export function PurchaseFormDrawer({
       <Drawer
         open={open}
         onClose={onClose}
-        title="Catat pembelian dari nota"
+        title={purchase ? `Ubah nota ${purchase.nota}` : "Catat pembelian dari nota"}
         footer={
           <>
             <button type="button" className="btn" onClick={onClose}>
               Batal
             </button>
             <button type="button" className="btn p" onClick={submit}>
-              Ajukan nota belanja
+              {purchase ? "Ajukan revisi nota" : "Ajukan nota belanja"}
             </button>
           </>
         }
       >
         <div className="sim mb-4">
-          Tip: salin isi nota/struk baris per baris. Menyimpan mengajukan nota ke
-          Owner — pembelian, tambahan stok, dan harga modal baru tercatat setelah
-          disetujui.
+          {purchase ? (
+            <>
+              Revisi nota <b>{purchase.id}</b> ({purchase.supplier}). Setelah Owner
+              menyetujui, qty barang menyesuaikan stok dan harga modal mengikuti
+              harga baru di nota ini.
+            </>
+          ) : (
+            <>
+              Tip: salin isi nota/struk baris per baris. Menyimpan mengajukan nota
+              ke Owner — pembelian, tambahan stok, dan harga modal baru tercatat
+              setelah disetujui.
+            </>
+          )}
         </div>
 
         <div className="grid sm:grid-cols-3 gap-3">
@@ -118,7 +141,7 @@ export function PurchaseFormDrawer({
         <div className="dsec">Daftar barang</div>
         <div className="space-y-2">
           {draft.items.map((it, i) => {
-            const last = lastPurchaseOf(db, it.vid);
+            const last = lastPurchaseOf(db, it.vid, purchase?.id);
             const delta = last ? it.cost - last.cost : 0;
             const pct = last && last.cost ? (delta / last.cost) * 100 : 0;
             return (
@@ -264,7 +287,17 @@ export function PurchaseDetailDrawer({
   onClose: () => void;
 }) {
   const { db, requestPurchaseLunas, toast } = useStore();
+  const [editOpen, setEditOpen] = useState(false);
   const p = db.purchases.find((x) => x.id === purchaseId);
+
+  /** Pengajuan yang masih menunggu approval Owner untuk nota ini. */
+  const pendingLunas = db.approvals.find(
+    (a) => a.kind === "purchase" && a.purchaseId === p?.id && a.status === "Menunggu",
+  );
+  const pendingRevision = db.approvals.find(
+    (a) => a.kind === "notaEdit" && a.purchaseId === p?.id && a.status === "Menunggu",
+  );
+
   if (!p) return null;
 
   const total = purchaseTotal(p);
@@ -276,13 +309,19 @@ export function PurchaseDetailDrawer({
   };
 
   return (
+    <>
     <Drawer
       open={Boolean(purchaseId)}
       onClose={onClose}
       title="Detail Pembelian Supplier"
       footer={
         <>
-          {p.payStatus === "Belum Lunas" && (
+          {!pendingRevision && !editOpen && (
+            <button type="button" className="btn" onClick={() => setEditOpen(true)}>
+              Ubah nota
+            </button>
+          )}
+          {p.payStatus === "Belum Lunas" && !editOpen && (
             <button type="button" className="btn p" onClick={requestLunas}>
               Ajukan pelunasan
             </button>
@@ -307,7 +346,23 @@ export function PurchaseDetailDrawer({
 
       {p.payStatus === "Menunggu Lunas" && (
         <div className="sim" style={{ background: "var(--wab)", borderColor: "#f6e4a6", color: "var(--wa)" }}>
-          Pengajuan pelunasan menunggu approval Owner di menu Approval.
+          Nota ini sudah diajukan <b>lunas</b> dan sedang menunggu persetujuan
+          Owner di menu Approval — statusnya jadi <b>Menunggu Lunas</b> supaya
+          tidak diajukan dua kali. Setelah disetujui, status berubah menjadi{" "}
+          <b>Lunas</b>; kalau ditolak kembali ke <b>Belum Lunas</b>.
+          {pendingLunas && (
+            <div className="mt-1 text-[12px]">
+              Diajukan {pendingLunas.user} · {pendingLunas.time}
+            </div>
+          )}
+        </div>
+      )}
+
+      {pendingRevision && (
+        <div className="sim" style={{ background: "var(--wab)", borderColor: "#f6e4a6", color: "var(--wa)" }}>
+          Ada <b>pengajuan revisi nota</b> dari {pendingRevision.user} ·{" "}
+          {pendingRevision.time} yang belum disetujui Owner, jadi nota ini belum
+          bisa diubah lagi sampai pengajuan itu diputuskan.
         </div>
       )}
 
@@ -431,7 +486,19 @@ export function PurchaseDetailDrawer({
           <span style={{ color: "var(--mu)" }}>Tanggal pembelian</span>
           <b style={{ color: "var(--nv)" }}>{formatDate(p.date)}</b>
         </div>
+        <div className="flex justify-between py-1.5">
+          <span style={{ color: "var(--mu)" }}>Status pembayaran</span>
+          <b style={{ color: "var(--nv)" }}>{p.payStatus}</b>
+        </div>
       </div>
     </Drawer>
+
+    <PurchaseFormDrawer
+      key={`purchase-edit-${editOpen ? "open" : "closed"}-${p.id}`}
+      open={editOpen}
+      purchase={p}
+      onClose={() => setEditOpen(false)}
+    />
+    </>
   );
 }

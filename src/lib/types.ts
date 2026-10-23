@@ -119,6 +119,7 @@ export type ApprovalKind =
   | "purchase"
   | "sale"
   | "nota"
+  | "notaEdit"
   | "invoice";
 
 /** Usulan invoice penjualan baru — baru tercatat setelah disetujui Owner. */
@@ -163,7 +164,8 @@ export type Approval = {
   /**
    * variant = ubah data varian/produk, payment = pelunasan invoice,
    * purchase = status bayar pembelian, sale = harga & biaya invoice,
-   * nota = izin belanja satu nota supplier.
+   * nota = izin belanja satu nota supplier,
+   * notaEdit = revisi satu nota belanja yang sudah tercatat.
    */
   kind: ApprovalKind;
   type: string;

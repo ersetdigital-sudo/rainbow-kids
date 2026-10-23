@@ -2,7 +2,7 @@
 
 import { formatDate } from "@/lib/date";
 import { rp } from "@/lib/format";
-import { itemProfit, variantLabel } from "@/lib/calc";
+import { itemProfit, purchaseTotal, variantLabel } from "@/lib/calc";
 import { useStore } from "@/lib/store";
 import { Badge } from "@/components/ui/Badge";
 import { Drawer } from "@/components/ui/Drawer";
@@ -299,6 +299,237 @@ export function ApprovalDetailDrawer({
               baru berlaku setelah Owner menyetujui.
             </div>
           )}
+        </div>
+      </Drawer>
+    );
+  }
+
+  /* ---------------- Pelunasan pembelian supplier ---------------- */
+  if (a.kind === "purchase") {
+    const p = db.purchases.find((x) => x.id === a.purchaseId);
+    const items = p?.items ?? [];
+    const total = p ? purchaseTotal(p) : 0;
+    const qty = items.reduce((x, i) => x + i.qty, 0);
+    return (
+      <Drawer
+        open={Boolean(approvalId)}
+        onClose={onClose}
+        title="Detail pelunasan nota"
+        footer={
+          <button type="button" className="btn" onClick={onClose}>
+            Tutup
+          </button>
+        }
+      >
+        <div className="sdtop">
+          <div>
+            <div className="text-xs" style={{ color: "var(--mu)" }}>
+              {p ? `${p.id} · nota ${p.nota}` : (a.purchaseId ?? "-")}
+            </div>
+            <div className="font-extrabold text-lg" style={{ color: "var(--nv)" }}>
+              {p?.supplier ?? "-"}
+            </div>
+          </div>
+          <Badge tone={a.status}>{a.status}</Badge>
+        </div>
+
+        <div className="sim mb-3">
+          Cocokkan <b>no. nota</b>, <b>tanggal</b>, dan <b>total</b> di bawah ini
+          dengan nota fisik supplier sebelum menyetujui, supaya transaksi bernilai
+          mirip tidak terbayar dua kali.
+        </div>
+
+        <div className="sdc">
+          <div className="sdh">
+            <span className="sdi">🧾</span>
+            <span>Nota yang akan dilunasi</span>
+            <span className="ml-auto font-semibold" style={{ color: "var(--nv)" }}>
+              {items.length} jenis
+            </span>
+          </div>
+
+          {items.map((i) => (
+            <div
+              key={i.vid}
+              className="flex justify-between gap-3 py-2 border-b"
+              style={{ borderColor: "var(--ln)" }}
+            >
+              <div className="min-w-0">
+                <div className="font-semibold text-[13.5px]" style={{ color: "var(--nv)" }}>
+                  {variantLabel(db, i.vid)}
+                </div>
+                <div className="text-[12px]" style={{ color: "var(--mu)" }}>
+                  {i.qty} × {rp(i.cost)}
+                </div>
+              </div>
+              <div className="text-right whitespace-nowrap">
+                <div className="num font-semibold">{rp(i.qty * i.cost)}</div>
+              </div>
+            </div>
+          ))}
+
+          <div className="sdtot">
+            <span>Total nota</span>
+            <span className="num">{rp(total)}</span>
+          </div>
+        </div>
+
+        <div className="text-[13px] px-1">
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>Tanggal pembelian</span>
+            <b style={{ color: "var(--nv)" }}>{formatDate(p?.date ?? "")}</b>
+          </div>
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>Total unit</span>
+            <b style={{ color: "var(--nv)" }}>{qty} unit</b>
+          </div>
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>Status sekarang</span>
+            <b style={{ color: "var(--nv)" }}>{p?.payStatus ?? "-"}</b>
+          </div>
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>Setelah disetujui</span>
+            <b style={{ color: "var(--nv)" }}>Lunas</b>
+          </div>
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>Diajukan</span>
+            <b style={{ color: "var(--nv)" }}>{a.user}</b>
+          </div>
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>Waktu</span>
+            <b style={{ color: "var(--nv)" }}>{a.time}</b>
+          </div>
+        </div>
+      </Drawer>
+    );
+  }
+
+  /* ---------------- Revisi nota belanja ---------------- */
+  if (a.kind === "notaEdit") {
+    const p = db.purchases.find((x) => x.id === a.purchaseId);
+    const req = a.purchaseRequest;
+    const next = req?.items ?? [];
+    const vids = [
+      ...new Set([...(p?.items ?? []).map((i) => i.vid), ...next.map((i) => i.vid)]),
+    ];
+    return (
+      <Drawer
+        open={Boolean(approvalId)}
+        onClose={onClose}
+        title="Detail revisi nota belanja"
+        footer={
+          <button type="button" className="btn" onClick={onClose}>
+            Tutup
+          </button>
+        }
+      >
+        <div className="sdtop">
+          <div>
+            <div className="text-xs" style={{ color: "var(--mu)" }}>
+              {p ? `${p.id} · nota ${p.nota}` : (a.purchaseId ?? "-")}
+            </div>
+            <div className="font-extrabold text-lg" style={{ color: "var(--nv)" }}>
+              {req?.supplier ?? p?.supplier ?? "-"}
+            </div>
+          </div>
+          <Badge tone={a.status}>{a.status}</Badge>
+        </div>
+
+        <div className="sdc">
+          <div className="sdh">
+            <span className="sdi">🧾</span>
+            <span>Perubahan barang</span>
+            <span className="ml-auto font-semibold" style={{ color: "var(--nv)" }}>
+              {next.length} jenis
+            </span>
+          </div>
+
+          {vids.map((vid) => {
+            const was = p?.items.find((i) => i.vid === vid);
+            const now = next.find((i) => i.vid === vid);
+            const qtyChanged = (was?.qty ?? 0) !== (now?.qty ?? 0);
+            const costChanged = was ? now && +now.cost !== +was.cost : Boolean(now);
+            return (
+              <div
+                key={vid}
+                className="flex justify-between gap-3 py-2 border-b"
+                style={{ borderColor: "var(--ln)" }}
+              >
+                <div className="min-w-0">
+                  <div className="font-semibold text-[13.5px]" style={{ color: "var(--nv)" }}>
+                    {variantLabel(db, vid)}
+                  </div>
+                  <div className="text-[12px]" style={{ color: "var(--mu)" }}>
+                    qty{" "}
+                    <b style={{ color: qtyChanged ? "var(--nv)" : "var(--mu)" }}>
+                      {was?.qty ?? 0} → {now?.qty ?? 0}
+                    </b>{" "}
+                    · harga{" "}
+                    <b style={{ color: costChanged ? "var(--nv)" : "var(--mu)" }}>
+                      {rp(was?.cost ?? 0)} → {rp(now?.cost ?? 0)}
+                    </b>
+                  </div>
+                  {!now && (
+                    <div className="text-[11.5px]" style={{ color: "var(--er)" }}>
+                      barang dibatalkan dari nota
+                    </div>
+                  )}
+                  {!was && (
+                    <div className="text-[11.5px]" style={{ color: "var(--ok)" }}>
+                      barang baru ditambahkan
+                    </div>
+                  )}
+                </div>
+                <div className="text-right whitespace-nowrap">
+                  <div className="num font-semibold">
+                    {rp((now?.qty ?? 0) * (now?.cost ?? 0))}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          <div className="sdtot">
+            <span>Total nota baru</span>
+            <span className="num">{rp(Number(a.after))}</span>
+          </div>
+        </div>
+
+        <div className="text-[13px] px-1">
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>No. nota</span>
+            <b style={{ color: "var(--nv)" }}>
+              {p?.nota ?? "-"} → {req?.nota ?? "-"}
+            </b>
+          </div>
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>Tanggal nota</span>
+            <b style={{ color: "var(--nv)" }}>
+              {formatDate(p?.date ?? "")} → {formatDate(req?.date ?? "")}
+            </b>
+          </div>
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>Supplier</span>
+            <b style={{ color: "var(--nv)" }}>
+              {p?.supplier ?? "-"} → {req?.supplier ?? "-"}
+            </b>
+          </div>
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>Total sebelumnya</span>
+            <span className="num">{rp(Number(a.before))}</span>
+          </div>
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>Diajukan</span>
+            <b style={{ color: "var(--nv)" }}>{a.user}</b>
+          </div>
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>Waktu</span>
+            <b style={{ color: "var(--nv)" }}>{a.time}</b>
+          </div>
+          <div className="text-[11.5px] mt-1" style={{ color: "var(--wa)" }}>
+            Stok dan harga modal menyesuaikan selisih qty/harga di atas setelah
+            Owner menyetujui revisi ini.
+          </div>
         </div>
       </Drawer>
     );
