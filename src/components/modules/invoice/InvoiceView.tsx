@@ -90,6 +90,9 @@ export function InvoiceView({ invoiceId }: { invoiceId?: string }) {
             >
               Cetak / Simpan PDF
             </button>
+            <Link href="/settings" className="btn">
+              Atur alamat toko
+            </Link>
           </>
         }
       />
