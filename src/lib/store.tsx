@@ -110,9 +110,55 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         (x) => x.name.toLowerCase() === name.toLowerCase(),
       );
       if (exists) return { ok: false, msg: "Pelanggan dengan nama itu sudah ada" };
-      const customer: Customer = { id: uid("c"), name, type: c.type };
+      const customer: Customer = {
+        id: uid("c"),
+        name,
+        type: c.type,
+        phone: c.phone?.trim() || undefined,
+        address: c.address?.trim() || undefined,
+        bank: c.bank?.trim() || undefined,
+      };
       setSnapshot((prev) => ({ ...prev, customers: [...prev.customers, customer] }));
       return { ok: true, msg: `Pelanggan ${name} ditambahkan`, customer };
+    },
+    [],
+  );
+
+  /** Ubah data pelanggan (nama, jenis, HP, alamat, tujuan transfer). */
+  const updateCustomer = useCallback<StoreValue["updateCustomer"]>(
+    (id, patch) => {
+      const name = patch.name.trim();
+      if (!name) return { ok: false, msg: "Isi nama pelanggan" };
+      const current = getSnapshot();
+      if (!current.customers.some((c) => c.id === id))
+        return { ok: false, msg: "Pelanggan tidak ditemukan" };
+      if (
+        current.customers.some(
+          (c) => c.id !== id && c.name.toLowerCase() === name.toLowerCase(),
+        )
+      )
+        return { ok: false, msg: "Pelanggan dengan nama itu sudah ada" };
+
+      setSnapshot((prev) => ({
+        ...prev,
+        customers: prev.customers.map((c) =>
+          c.id === id
+            ? {
+                ...c,
+                name,
+                type: patch.type,
+                phone: patch.phone?.trim() || undefined,
+                address: patch.address?.trim() || undefined,
+                bank: patch.bank?.trim() || undefined,
+              }
+            : c,
+        ),
+        // Nama pelanggan di invoice lama ikut diperbarui agar konsisten.
+        sales: prev.sales.map((s) =>
+          s.customerId === id ? { ...s, customer: name } : s,
+        ),
+      }));
+      return { ok: true, msg: "Data pelanggan diperbarui" };
     },
     [],
   );
@@ -1165,6 +1211,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       toast,
       resetDemo,
       addCustomer,
+      updateCustomer,
       addSupplier,
       saveSale,
       requestSaleRevision,
@@ -1189,6 +1236,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       toast,
       resetDemo,
       addCustomer,
+      updateCustomer,
       addSupplier,
       saveSale,
       requestSaleRevision,
@@ -1234,7 +1282,18 @@ type StoreValue = {
     type: CustomerType;
     phone?: string;
     address?: string;
+    bank?: string;
   }) => Result;
+  updateCustomer: (
+    id: string,
+    patch: {
+      name: string;
+      type: CustomerType;
+      phone?: string;
+      address?: string;
+      bank?: string;
+    },
+  ) => Result;
   addSupplier: (s: { name: string; phone?: string; address?: string }) => Result;
   saveSale: (draft: SaleDraft) => Result;
   requestSaleRevision: (saleId: string, revision: SaleRevision) => Result;

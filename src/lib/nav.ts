@@ -2,6 +2,7 @@ export type IconName =
   | "hist"
   | "dash"
   | "sales"
+  | "cust"
   | "stock"
   | "purch"
   | "opname"
@@ -15,6 +16,7 @@ export const ICONS: Record<IconName, string> = {
   hist: '<path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/>',
   dash: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
   sales: '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0"/>',
+  cust: '<rect x="2" y="4" width="20" height="16" rx="2"/><circle cx="8" cy="10" r="2"/><path d="M5 16c.4-1.5 1.5-2.5 3-2.5s2.6 1 3 2.5M14 9h5M14 13h5"/>',
   stock: '<path d="m7.5 4.27 9 5.15M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.3 7 12 12l8.7-5M12 22V12"/>',
   purch: '<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z"/><path d="M8 8h8M8 12h8M8 16h5"/>',
   opname: '<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/>',
@@ -34,6 +36,7 @@ export const NAV: NavGroup[] = [
     items: [
       { href: "/", label: "Dashboard", icon: "dash" },
       { href: "/sales", label: "Penjualan", icon: "sales" },
+      { href: "/customers", label: "Data Pelanggan", icon: "cust" },
       { href: "/ar", label: "Piutang & Pembayaran", icon: "ar" },
       { href: "/invoice", label: "Invoice", icon: "invoice" },
     ],

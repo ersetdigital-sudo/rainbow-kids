@@ -52,6 +52,11 @@ export function SalesView() {
     [db.sales, query, type, pay],
   );
 
+  /** Data pelanggan terbaru untuk kolom kontak & rekening di file ekspor. */
+  const customerOf = (s: Sale) =>
+    db.customers.find((c) => c.id === s.customerId) ??
+    db.customers.find((c) => c.name === s.customer);
+
   const exportRows = () => {
     downloadCsv(
       `penjualan-rainbow-kids-${stamp()}`,
@@ -60,6 +65,9 @@ export function SalesView() {
         "Tanggal order",
         "Jatuh tempo",
         "Pelanggan",
+        "No. HP",
+        "Alamat",
+        "Tujuan Transfer",
         "Jenis",
         "Total",
         "Modal",
@@ -74,6 +82,9 @@ export function SalesView() {
         formatDate(s.date),
         s.due ? formatDate(s.due) : "-",
         s.customer,
+        customerOf(s)?.phone?.trim() || "-",
+        customerOf(s)?.address?.trim() || "-",
+        customerOf(s)?.bank?.trim() || "-",
         s.type === "tempo" ? "Tempo" : "Tunai",
         rp(saleTotal(s)),
         rp(saleCost(s)),

@@ -1,4 +1,4 @@
-export type Role = "Owner" | "Admin" | "Staff";
+export type Role = "Owner" | "Admin" | "Approver" | "User";
 
 export type ModuleKey =
   | "dash"
@@ -38,6 +38,8 @@ export type Customer = {
   type: CustomerType;
   phone?: string;
   address?: string;
+  /** Rekening tujuan transfer khusus pelanggan ini (tampil di invoice). */
+  bank?: string;
 };
 
 export type Supplier = {
@@ -252,3 +254,6 @@ export type ArStatus =
   | "Jatuh tempo"
   | "Belum jatuh tempo"
   | "Menunggu Pelunasan";
+
+/** Posisi tagihan ringkas: sudah lunas, belum lunas, atau belum jatuh tempo. */
+export type PaymentPosition = "Lunas" | "Belum Lunas" | "Belum Jatuh Tempo";

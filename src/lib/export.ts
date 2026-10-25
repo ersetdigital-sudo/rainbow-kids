@@ -1,7 +1,13 @@
 /**
  * Ekspor tabel ke file yang bisa dibuka Excel (.csv dengan separator ";"
  * dan BOM UTF-8 supaya karakter Indonesia terbaca rapi).
+ *
+ * Baris `sep=;` di awal file memberi tahu Excel agar memakai ";" sebagai
+ * pemisah kolom, apa pun setting regional komputernya. Tanpa ini Excel
+ * dengan locale "," menaruh seluruh baris di kolom A.
  */
+const SEP = ";";
+
 export function toCsv(
   headers: string[],
   rows: (string | number | null | undefined)[][],
@@ -10,7 +16,7 @@ export function toCsv(
     const s = v === null || v === undefined ? "" : String(v);
     return `"${s.replace(/"/g, '""')}"`;
   };
-  return [headers, ...rows].map((r) => r.map(escape).join(";")).join("\r\n");
+  return [headers, ...rows].map((r) => r.map(escape).join(SEP)).join("\r\n");
 }
 
 export function downloadCsv(
@@ -18,8 +24,9 @@ export function downloadCsv(
   headers: string[],
   rows: (string | number | null | undefined)[][],
 ) {
-  const csv = toCsv(headers, rows);
-  const blob = new Blob(["\uFEFF" + csv], {
+  // BOM UTF-8 + deklarasi separator, keduanya dibaca Excel saat file dibuka.
+  const csv = `\uFEFFsep=${SEP}\r\n${toCsv(headers, rows)}`;
+  const blob = new Blob([csv], {
     type: "text/csv;charset=utf-8;",
   });
   const url = URL.createObjectURL(blob);

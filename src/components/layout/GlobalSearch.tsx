@@ -72,7 +72,7 @@ export function GlobalSearch() {
       .forEach((c) =>
         out.push({
           key: `c-${c.id}`,
-          href: "/sales",
+          href: "/customers",
           kind: "Pelanggan",
           title: c.name,
           sub: `${c.type}${c.phone ? ` · ${c.phone}` : ""}`,

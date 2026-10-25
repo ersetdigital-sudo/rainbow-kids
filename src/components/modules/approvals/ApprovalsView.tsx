@@ -2,13 +2,13 @@
 
 import { useMemo, useState } from "react";
 import { rp } from "@/lib/format";
-import { variantLabel } from "@/lib/calc";
+import { paymentPosition, saleRequestPosition, variantLabel } from "@/lib/calc";
 import { useStore } from "@/lib/store";
 import { Badge } from "@/components/ui/Badge";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { PageHead } from "@/components/ui/PageHead";
 import { ApprovalDetailDrawer } from "./ApprovalDetailDrawer";
-import type { Approval } from "@/lib/types";
+import type { Approval, PaymentPosition } from "@/lib/types";
 
 const FILTERS = ["Menunggu", "Disetujui", "Ditolak", "Semua"] as const;
 type Filter = (typeof FILTERS)[number];
@@ -60,6 +60,17 @@ export function ApprovalsView() {
     return variantLabel(db, a.vid ?? "");
   };
 
+  /** Posisi tagihan invoice terkait: lunas / belum lunas / belum jatuh tempo. */
+  const position = (a: Approval): PaymentPosition | null => {
+    if (a.kind === "invoice")
+      return a.saleRequest ? saleRequestPosition(a.saleRequest) : null;
+    if (a.kind === "payment" || a.kind === "sale") {
+      const s = db.sales.find((x) => x.id === a.saleId);
+      return s ? paymentPosition(s) : null;
+    }
+    return null;
+  };
+
   const fmt = (a: Approval, v: string | number) => {
     if (a.field === "name") return String(v);
     if (a.kind === "purchase") return String(v);
@@ -76,6 +87,18 @@ export function ApprovalsView() {
     { key: "time", label: "Waktu", render: (a) => a.time },
     { key: "type", label: "Perubahan", render: (a) => a.type },
     { key: "vid", label: "Objek", render: (a) => subject(a) },
+    {
+      key: "position",
+      label: "Posisi tagihan",
+      render: (a) => {
+        const pos = position(a);
+        return pos ? (
+          <Badge tone={pos}>{pos}</Badge>
+        ) : (
+          <span style={{ color: "var(--mu)" }}>—</span>
+        );
+      },
+    },
     {
       key: "before",
       label: "Sebelum",
