@@ -26,6 +26,7 @@ import {
 } from "./persist";
 import type {
   ApprovalField,
+  Biz,
   CostChange,
   Customer,
   CustomerType,
@@ -99,6 +100,31 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     resetSnapshot();
     toast("Data demo direset");
   }, [toast]);
+
+  /* ---------------- Data toko ---------------- */
+
+  /** Simpan identitas toko yang tercetak di kepala invoice. */
+  const updateBiz = useCallback<StoreValue["updateBiz"]>(
+    (patch) => {
+      const name = patch.name.trim();
+      const addr = patch.addr.trim();
+      if (!name) return { ok: false, msg: "Isi nama toko" };
+      if (!addr) return { ok: false, msg: "Isi alamat toko" };
+      setSnapshot((prev) => ({
+        ...prev,
+        biz: {
+          name,
+          addr,
+          phone: patch.phone.trim(),
+          email: patch.email.trim(),
+          npwp: patch.npwp.trim(),
+          bank: patch.bank.trim(),
+        },
+      }));
+      return { ok: true, msg: "Data toko disimpan" };
+    },
+    [],
+  );
 
   /* ---------------- Pelanggan & supplier ---------------- */
 
@@ -1210,6 +1236,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       db,
       toast,
       resetDemo,
+      updateBiz,
       addCustomer,
       updateCustomer,
       addSupplier,
@@ -1235,6 +1262,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       db,
       toast,
       resetDemo,
+      updateBiz,
       addCustomer,
       updateCustomer,
       addSupplier,
@@ -1277,6 +1305,7 @@ type StoreValue = {
   db: DB;
   toast: (msg: string) => void;
   resetDemo: () => void;
+  updateBiz: (patch: Biz) => Result;
   addCustomer: (c: {
     name: string;
     type: CustomerType;
