@@ -5,6 +5,7 @@ const STATUS_CLASS: Record<string, string> = {
   Terlambat: "b-er",
   "Jatuh tempo": "b-wa",
   "Belum jatuh tempo": "b-in",
+  "Belum Jatuh Tempo": "b-in",
   "Menunggu Pelunasan": "b-wa",
   Menunggu: "b-wa",
   "Menunggu Lunas": "b-wa",

@@ -66,7 +66,7 @@ export function UsersView() {
             toast("Role diperbarui");
           }}
         >
-          {(["Owner", "Admin", "Staff"] as Role[]).map((r) => (
+          {(["Owner", "Admin", "Approver", "User"] as Role[]).map((r) => (
             <option key={r} value={r}>
               {r}
             </option>
@@ -127,7 +127,8 @@ export function UsersView() {
                 <th>Modul</th>
                 <th>Owner</th>
                 <th>Admin</th>
-                <th>Staff</th>
+                <th>Approver</th>
+                <th>User</th>
               </tr>
             </thead>
             <tbody>
@@ -136,7 +137,7 @@ export function UsersView() {
                   <td data-label="Modul" className="font-semibold">
                     {label}
                   </td>
-                  {(["Owner", "Admin", "Staff"] as Role[]).map((role) => {
+                  {(["Owner", "Admin", "Approver", "User"] as Role[]).map((role) => {
                     const v = db.perms[role][key];
                     return (
                       <td key={role} data-label={role}>

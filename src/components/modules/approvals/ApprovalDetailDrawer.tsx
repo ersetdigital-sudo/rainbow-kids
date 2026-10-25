@@ -2,7 +2,13 @@
 
 import { formatDate } from "@/lib/date";
 import { rp } from "@/lib/format";
-import { itemProfit, purchaseTotal, variantLabel } from "@/lib/calc";
+import {
+  itemProfit,
+  paymentPosition,
+  purchaseTotal,
+  saleRequestPosition,
+  variantLabel,
+} from "@/lib/calc";
 import { useStore } from "@/lib/store";
 import { Badge } from "@/components/ui/Badge";
 import { Drawer } from "@/components/ui/Drawer";
@@ -173,6 +179,12 @@ export function ApprovalDetailDrawer({
               <b style={{ color: "var(--nv)" }}>{rp(req.paid)}</b>
             </div>
           )}
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>Posisi tagihan</span>
+            <Badge tone={saleRequestPosition(req)}>
+              {saleRequestPosition(req)}
+            </Badge>
+          </div>
           <div className="flex justify-between py-1.5">
             <span style={{ color: "var(--mu)" }}>Diajukan</span>
             <b style={{ color: "var(--nv)" }}>{a.user}</b>
@@ -650,6 +662,12 @@ export function ApprovalDetailDrawer({
               {rp(Number(a.after))}
             </b>
           </div>
+          {sale && (
+            <div className="flex justify-between py-1.5 text-[13px]">
+              <span style={{ color: "var(--mu)" }}>Posisi tagihan</span>
+              <Badge tone={paymentPosition(sale)}>{paymentPosition(sale)}</Badge>
+            </div>
+          )}
         </div>
       </Drawer>
     );

@@ -47,6 +47,12 @@ export function InvoiceView({ invoiceId }: { invoiceId?: string }) {
   }
 
   const b = db.biz;
+  // Rekening tujuan transfer berasal dari data pelanggan; rekening utama toko
+  // hanya dipakai bila pelanggan belum punya rekening sendiri.
+  const customer =
+    db.customers.find((c) => c.id === sale.customerId) ??
+    db.customers.find((c) => c.name === sale.customer);
+  const transferTo = customer?.bank?.trim() || b.bank;
   const st = arStatus(sale);
   const statusStyle =
     st === "Lunas"
@@ -278,7 +284,7 @@ export function InvoiceView({ invoiceId }: { invoiceId?: string }) {
             <div style={{ color: "#555", lineHeight: 1.6, fontSize: 11 }}>
               <b>Pembayaran transfer ke:</b>
               <br />
-              {b.bank}
+              {transferTo}
               <br />
               Mohon cantumkan no. invoice saat transfer.
             </div>

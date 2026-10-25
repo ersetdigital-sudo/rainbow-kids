@@ -2,6 +2,14 @@ import { TODAY, addDays } from "./date";
 import { saleTotal } from "./calc";
 import type { DB } from "./types";
 
+/** Hak akses bawaan per role (dipakai juga saat memulihkan snapshot lama). */
+export const DEFAULT_PERMS: DB["perms"] = {
+  Owner: { dash: "Penuh", sales: "Penuh", stock: "Penuh", purch: "Penuh", opname: "Setujui", ar: "Penuh", report: "Penuh", approval: "Setujui", users: "Penuh" },
+  Admin: { dash: "Lihat", sales: "Penuh", stock: "Ajukan", purch: "Penuh", opname: "Input", ar: "Penuh", report: "Lihat", approval: "Ajukan", users: "Tidak" },
+  Approver: { dash: "Lihat", sales: "Lihat", stock: "Lihat", purch: "Lihat", opname: "Setujui", ar: "Lihat", report: "Lihat", approval: "Setujui", users: "Tidak" },
+  User: { dash: "Lihat", sales: "Input", stock: "Lihat", purch: "Input", opname: "Input", ar: "Lihat", report: "Tidak", approval: "Ajukan", users: "Tidak" },
+};
+
 /**
  * Data simulasi statis. Seed harus deterministik (tidak boleh pakai
  * Date.now/Math.random) supaya render server & client konsisten.
@@ -258,7 +266,7 @@ export function seed(): DB {
     { vid: "v7", date: addDays(TODAY, -18), type: "Harga", desc: "Harga modal Rp 25.000 → Rp 27.000", user: "Budi (Owner)" },
     { vid: "v9", date: addDays(TODAY, -12), type: "Stok", desc: "Stok opname SO-001: -1 (rusak)", user: "Budi (Owner)" },
     { vid: "v1", date: addDays(TODAY, -7), type: "Stok", desc: "Pembelian PB-005 +40", user: "Rina (Admin)" },
-    { vid: "v9", date: addDays(TODAY, -2), type: "Stok", desc: "Penjualan INV-2610-0081 −9 (stok minus)", user: "Dimas (Staff)" },
+    { vid: "v9", date: addDays(TODAY, -2), type: "Stok", desc: "Penjualan INV-2610-0081 −9 (stok minus)", user: "Dimas (User)" },
   ];
 
   const approvals: DB["approvals"] = [
@@ -283,7 +291,7 @@ export function seed(): DB {
       field: "name",
       before: "Angka 1-10",
       after: "Angka",
-      user: "Dimas (Staff)",
+      user: "Dimas (User)",
       time: addDays(TODAY, -6) + " 15:40",
       status: "Disetujui",
       by: "Budi (Owner)",
@@ -308,7 +316,7 @@ export function seed(): DB {
       field: "price",
       before: 169000,
       after: 179000,
-      user: "Dimas (Staff)",
+      user: "Dimas (User)",
       time: TODAY + " 08:31",
       status: "Menunggu",
     },
@@ -320,7 +328,7 @@ export function seed(): DB {
       field: "price",
       before: 45000,
       after: 39000,
-      user: "Dimas (Staff)",
+      user: "Dimas (User)",
       time: addDays(TODAY, -4) + " 11:20",
       status: "Ditolak",
       by: "Budi (Owner)",
@@ -343,7 +351,7 @@ export function seed(): DB {
       saleId: "INV-2610-0079",
       before: 228000,
       after: 228000,
-      user: "Dimas (Staff)",
+      user: "Dimas (User)",
       time: addDays(TODAY, -1) + " 17:05",
       status: "Menunggu",
     },
@@ -373,15 +381,9 @@ export function seed(): DB {
   const users: DB["users"] = [
     { name: "Budi Santoso", email: "budi@rainbowkids.id", role: "Owner", active: true },
     { name: "Rina Wulandari", email: "rina@rainbowkids.id", role: "Admin", active: true },
-    { name: "Dimas Pratama", email: "dimas@rainbowkids.id", role: "Staff", active: true },
-    { name: "Sari Lestari", email: "sari@rainbowkids.id", role: "Staff", active: false },
+    { name: "Dimas Pratama", email: "dimas@rainbowkids.id", role: "User", active: true },
+    { name: "Sari Lestari", email: "sari@rainbowkids.id", role: "Approver", active: false },
   ];
-
-  const perms: DB["perms"] = {
-    Owner: { dash: "Penuh", sales: "Penuh", stock: "Penuh", purch: "Penuh", opname: "Setujui", ar: "Penuh", report: "Penuh", approval: "Setujui", users: "Penuh" },
-    Admin: { dash: "Lihat", sales: "Penuh", stock: "Ajukan", purch: "Penuh", opname: "Input", ar: "Penuh", report: "Lihat", approval: "Ajukan", users: "Tidak" },
-    Staff: { dash: "Lihat", sales: "Input", stock: "Lihat", purch: "Input", opname: "Input", ar: "Lihat", report: "Tidak", approval: "Ajukan", users: "Tidak" },
-  };
 
   return {
     products,
@@ -394,7 +396,7 @@ export function seed(): DB {
     opnames,
     expenses,
     users,
-    perms,
+    perms: DEFAULT_PERMS,
     biz: {
       name: "Rainbow Kids",
       addr: "Jl. Pelangi Raya No. 8, Bandung 40115",

@@ -15,7 +15,7 @@ export function InviteUserDrawer({
   const { inviteUser, toast } = useStore();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<Role>("Staff");
+  const [role, setRole] = useState<Role>("User");
 
   const submit = () => {
     const res = inviteUser({ name, email, role });
@@ -23,10 +23,16 @@ export function InviteUserDrawer({
     if (res.ok) {
       setName("");
       setEmail("");
-      setRole("Staff");
+      setRole("User");
       onClose();
     }
   };
+
+  const ROLE_OPTIONS: { value: Role; label: string }[] = [
+    { value: "User", label: "User" },
+    { value: "Admin", label: "Admin" },
+    { value: "Approver", label: "Approver" },
+  ];
 
   return (
     <Drawer
@@ -63,8 +69,11 @@ export function InviteUserDrawer({
             value={role}
             onChange={(e) => setRole(e.target.value as Role)}
           >
-            <option value="Staff">Staff</option>
-            <option value="Admin">Admin</option>
+            {ROLE_OPTIONS.map((r) => (
+              <option key={r.value} value={r.value}>
+                {r.label}
+              </option>
+            ))}
           </select>
         </div>
       </div>

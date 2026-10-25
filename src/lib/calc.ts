@@ -3,10 +3,12 @@ import type {
   ArStatus,
   DB,
   Payment,
+  PaymentPosition,
   Product,
   Purchase,
   Sale,
   SaleItem,
+  SaleRequest,
   Variant,
 } from "./types";
 
@@ -44,6 +46,28 @@ export function arStatus(s: Sale, today = TODAY): ArStatus {
   if (s.due < today) return "Terlambat";
   if (s.due <= addDays(today, 3)) return "Jatuh tempo";
   return "Belum jatuh tempo";
+}
+
+/**
+ * Posisi tagihan ringkas untuk ditampilkan di approval:
+ * Lunas, Belum Lunas, atau Belum Jatuh Tempo.
+ */
+export function paymentPosition(s: Sale, today = TODAY): PaymentPosition {
+  if (saleTotal(s) - salePaid(s) <= 0) return "Lunas";
+  if (s.due && s.due > today) return "Belum Jatuh Tempo";
+  return "Belum Lunas";
+}
+
+/** Posisi tagihan untuk usulan invoice baru yang belum tercatat. */
+export function saleRequestPosition(
+  req: SaleRequest,
+  today = TODAY,
+): PaymentPosition {
+  const total = req.items.reduce((a, i) => a + i.qty * i.price, 0);
+  const paid = req.type === "tunai" ? total : +req.paid || 0;
+  if (total - paid <= 0) return "Lunas";
+  if (req.due && req.due > today) return "Belum Jatuh Tempo";
+  return "Belum Lunas";
 }
 
 /** Varian + produk induk, flattened. */

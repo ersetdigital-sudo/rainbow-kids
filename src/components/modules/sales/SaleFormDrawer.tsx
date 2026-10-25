@@ -33,6 +33,9 @@ export function SaleFormDrawer({
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [newType, setNewType] = useState<CustomerType>("Toko");
+  const [newPhone, setNewPhone] = useState("");
+  const [newAddress, setNewAddress] = useState("");
+  const [newBank, setNewBank] = useState("");
 
   // State di-reset lewat remount (parent memberi key berbeda tiap dibuka).
   const [draft, setDraft] = useState<SaleDraft>(() => ({
@@ -345,27 +348,67 @@ export function SaleFormDrawer({
           setDraft((d) => ({ ...d, customer: o.name, customerId: o.id }))
         }
         onCreate={(name) => {
-          const res = addCustomer({ name, type: newType });
+          const res = addCustomer({
+            name,
+            type: newType,
+            phone: newPhone,
+            address: newAddress,
+            bank: newBank,
+          });
           if (res.ok && res.customer) {
             setDraft((d) => ({
               ...d,
               customer: res.customer!.name,
               customerId: res.customer!.id,
             }));
+            setNewPhone("");
+            setNewAddress("");
+            setNewBank("");
           }
           return res;
         }}
         createLabel="Tambah pelanggan baru"
         createExtra={
-          <select
-            className="mb-2"
-            value={newType}
-            onChange={(e) => setNewType(e.target.value as CustomerType)}
-          >
-            <option value="Toko">Toko</option>
-            <option value="Reseller">Reseller</option>
-            <option value="Ritel">Ritel</option>
-          </select>
+          <div className="grid sm:grid-cols-2 gap-2 mb-2">
+            <div>
+              <label className="f">Jenis</label>
+              <select
+                value={newType}
+                onChange={(e) => setNewType(e.target.value as CustomerType)}
+              >
+                <option value="Toko">Toko</option>
+                <option value="Reseller">Reseller</option>
+                <option value="Ritel">Ritel</option>
+              </select>
+            </div>
+            <div>
+              <label className="f">No. HP (opsional)</label>
+              <input
+                aria-label="No. HP pelanggan baru"
+                value={newPhone}
+                onChange={(e) => setNewPhone(e.target.value)}
+                placeholder="0812-xxxx-xxxx"
+              />
+            </div>
+            <div>
+              <label className="f">Alamat (opsional)</label>
+              <input
+                aria-label="Alamat pelanggan baru"
+                value={newAddress}
+                onChange={(e) => setNewAddress(e.target.value)}
+                placeholder="Jl. ..."
+              />
+            </div>
+            <div>
+              <label className="f">Tujuan transfer (opsional)</label>
+              <input
+                aria-label="Tujuan transfer pelanggan baru"
+                value={newBank}
+                onChange={(e) => setNewBank(e.target.value)}
+                placeholder="mis. BCA 1234567890 a.n. Toko"
+              />
+            </div>
+          </div>
         }
       />
     </>

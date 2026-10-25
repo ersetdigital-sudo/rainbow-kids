@@ -1,7 +1,28 @@
-import { seed } from "./seed";
-import type { DB } from "./types";
+import { DEFAULT_PERMS, seed } from "./seed";
+import type { DB, Role } from "./types";
 
 const KEY = "rk_mock_v2";
+
+/**
+ * Normalisasi snapshot lama agar tetap terbaca: role "Staff" kini "User",
+ * dan role "Approver" yang baru dilengkapi hak akses bawaannya.
+ */
+function migrate(db: DB): DB {
+  const users = db.users.map((u) =>
+    (u.role as string) === "Staff" ? { ...u, role: "User" as Role } : u,
+  );
+  const old = db.perms as unknown as Record<
+    string,
+    Record<string, string>
+  >;
+  const perms = {
+    Owner: old.Owner ?? DEFAULT_PERMS.Owner,
+    Admin: old.Admin ?? DEFAULT_PERMS.Admin,
+    Approver: old.Approver ?? DEFAULT_PERMS.Approver,
+    User: (old.User ?? old.Staff ?? DEFAULT_PERMS.User) as Record<string, string>,
+  } as DB["perms"];
+  return { ...db, users, perms };
+}
 
 let clientCache: DB | null = null;
 let serverCache: DB | null = null;
@@ -21,7 +42,7 @@ export function getSnapshot(): DB {
     const raw = window.localStorage.getItem(KEY);
     const parsed = raw ? (JSON.parse(raw) as DB) : null;
     if (parsed && Array.isArray(parsed.products)) {
-      clientCache = parsed;
+      clientCache = migrate(parsed);
     } else {
       // Seed demo langsung disimpan agar konsisten antar reload/sesi.
       clientCache = getServerSnapshot();
