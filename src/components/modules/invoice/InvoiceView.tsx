@@ -41,8 +41,31 @@ export function InvoiceView({ invoiceId }: { invoiceId?: string }) {
     return () => ro.disconnect();
   }, []);
 
-  const sale = db.sales.find((s) => s.id === selected) ?? db.sales[db.sales.length - 1];
+  const sale =
+    db.sales.find((s) => s.id === selected) ??
+    (invoiceId ? null : db.sales[db.sales.length - 1]);
   if (!sale) {
+    if (invoiceId) {
+      return (
+        <>
+          <PageHead
+            title="Invoice"
+            subtitle="Invoice tidak ditemukan di data penjualan."
+          />
+          <div className="card p-8 text-center">
+            <div className="font-bold text-lg" style={{ color: "var(--nv)" }}>
+              Invoice sudah dihapus
+            </div>
+            <p className="text-sm mt-1" style={{ color: "var(--mu)" }}>
+              Invoice {invoiceId} sudah dihapus dari data penjualan.
+            </p>
+            <Link href="/sales" className="btn mt-4">
+              Kembali ke daftar penjualan
+            </Link>
+          </div>
+        </>
+      );
+    }
     return <p className="text-sm">Belum ada invoice.</p>;
   }
 

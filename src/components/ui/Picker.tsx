@@ -8,6 +8,7 @@ export type PickerOption = {
   name: string;
   sub?: string;
   badge?: string;
+  badges?: React.ReactNode;
 };
 
 /**
@@ -161,7 +162,13 @@ export function Picker({
                       </div>
                     )}
                   </div>
-                  {o.badge && <span className="bd b-in flex-none">{o.badge}</span>}
+                  {o.badges ? (
+                    <span className="flex flex-none flex-wrap gap-1 justify-end">
+                      {o.badges}
+                    </span>
+                  ) : (
+                    o.badge && <span className="bd b-in flex-none">{o.badge}</span>
+                  )}
                 </button>
               ))}
             </div>

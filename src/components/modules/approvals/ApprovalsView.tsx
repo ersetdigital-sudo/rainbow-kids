@@ -13,6 +13,17 @@ import type { Approval, PaymentPosition } from "@/lib/types";
 const FILTERS = ["Menunggu", "Disetujui", "Ditolak", "Semua"] as const;
 type Filter = (typeof FILTERS)[number];
 
+const DETAIL_KINDS = new Set<Approval["kind"]>([
+  "nota",
+  "notaEdit",
+  "purchase",
+  "sale",
+  "invoice",
+  "customer",
+  "customerDelete",
+  "saleDelete",
+]);
+
 export function ApprovalsView({ focusId = null }: { focusId?: string | null }) {
   const { db, decideApproval, toast } = useStore();
   const [filter, setFilter] = useState<Filter>(focusId ? "Semua" : "Menunggu");
@@ -57,6 +68,19 @@ export function ApprovalsView({ focusId = null }: { focusId?: string | null }) {
       const p = db.purchases.find((x) => x.id === a.purchaseId);
       return `Revisi nota ${a.purchaseRequest?.nota ?? p?.nota ?? "-"} · ${a.purchaseRequest?.supplier ?? p?.supplier ?? "-"}`;
     }
+    if (a.kind === "customer" || a.kind === "customerDelete") {
+      return (
+        a.customerName ??
+        db.customers.find((c) => c.id === a.customerId)?.name ??
+        "-"
+      );
+    }
+    if (a.kind === "saleDelete") {
+      const s = db.sales.find((x) => x.id === a.saleId);
+      if (a.saleSnapshot)
+        return `${a.saleSnapshot.id} · ${a.saleSnapshot.customer}`;
+      return s ? `${s.id} · ${s.customer}` : (a.saleId ?? "-");
+    }
     return variantLabel(db, a.vid ?? "");
   };
 
@@ -74,6 +98,12 @@ export function ApprovalsView({ focusId = null }: { focusId?: string | null }) {
   const fmt = (a: Approval, v: string | number) => {
     if (a.field === "name") return String(v);
     if (a.kind === "purchase") return String(v);
+    if (
+      a.kind === "customer" ||
+      a.kind === "customerDelete" ||
+      a.kind === "saleDelete"
+    )
+      return typeof v === "number" ? rp(v) : String(v);
     if (a.kind === "payment") return rp(Number(v));
     return rp(Number(v));
   };
@@ -104,7 +134,12 @@ export function ApprovalsView({ focusId = null }: { focusId?: string | null }) {
       label: "Sebelum",
       render: (a) => (
         <span style={{ color: "var(--mu)" }}>
-          {a.kind === "invoice" ? "—" : <s>{fmt(a, a.before)}</s>}
+          {a.kind === "invoice" ||
+          (a.kind === "customer" && a.before === "—") ? (
+            "—"
+          ) : (
+            <s>{fmt(a, a.before)}</s>
+          )}
         </span>
       ),
     },
@@ -125,6 +160,11 @@ export function ApprovalsView({ focusId = null }: { focusId?: string | null }) {
               oleh {a.by}
             </div>
           )}
+          {a.note && (
+            <div className="text-[11px] mt-0.5" style={{ color: "var(--er)" }}>
+              {a.note}
+            </div>
+          )}
         </div>
       ),
     },
@@ -135,11 +175,7 @@ export function ApprovalsView({ focusId = null }: { focusId?: string | null }) {
       align: "right",
       render: (a) => (
         <div className="flex gap-1 justify-end">
-          {(a.kind === "nota" ||
-            a.kind === "notaEdit" ||
-            a.kind === "purchase" ||
-            a.kind === "sale" ||
-            a.kind === "invoice") && (
+          {DETAIL_KINDS.has(a.kind) && (
             <button
               type="button"
               className="btn s"
@@ -181,7 +217,13 @@ export function ApprovalsView({ focusId = null }: { focusId?: string | null }) {
                             ? "Nota disetujui — harga beli diperbarui"
                             : a.kind === "sale"
                               ? "Harga & biaya invoice disetujui"
-                              : "Perubahan disetujui & diterapkan",
+                              : a.kind === "customer"
+                                ? "Pelanggan disetujui — status Aktif"
+                                : a.kind === "customerDelete"
+                                  ? "Pengajuan hapus toko disetujui"
+                                  : a.kind === "saleDelete"
+                                    ? "Order dihapus — stok dikembalikan"
+                                    : "Perubahan disetujui & diterapkan",
                   );
                 }}
               >

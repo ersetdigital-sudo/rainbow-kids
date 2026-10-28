@@ -6,7 +6,9 @@ import { formatDate, TODAY } from "@/lib/date";
 import { rp, initials } from "@/lib/format";
 import {
   arStatus,
+  customerStatus,
   itemProfit,
+  overdueSales,
   saleCost,
   saleOps,
   salePaid,
@@ -20,56 +22,18 @@ import { useStore } from "@/lib/store";
 import { Badge } from "@/components/ui/Badge";
 import { Drawer } from "@/components/ui/Drawer";
 import { MoneyInput } from "@/components/ui/NumericInput";
+import { ReasonDialog } from "@/components/ui/ReasonDialog";
 import { SaleEditPanel } from "./SaleEditPanel";
 
-const ICONS = {
-  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>',
-  shop: '<path d="M3 9l1.5-5h15L21 9M4 9v11h16V9M3 9h18"/>',
-  cash: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>',
-  trend: '<path d="M3 17l6-6 4 4 8-8M15 7h6v6"/>',
+const ICON = {
+  pencil:
+    '<path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/>',
+  doc: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h5"/>',
+  trash:
+    '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/>',
+  card: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>',
+  copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
 };
-
-function Head({ icon, title, extra }: { icon: string; title: string; extra?: string }) {
-  return (
-    <div className="sdh">
-      <span className="sdi">
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          aria-hidden="true"
-          dangerouslySetInnerHTML={{ __html: icon }}
-        />
-      </span>
-      <span>{title}</span>
-      {extra && (
-        <span className="ml-auto font-semibold" style={{ color: "var(--nv)" }}>
-          {extra}
-        </span>
-      )}
-    </div>
-  );
-}
-
-function Row({
-  label,
-  value,
-  className = "",
-}: {
-  label: React.ReactNode;
-  value: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={`flex justify-between gap-3 py-1.5 ${className}`}>
-      <span style={{ color: "var(--mu)" }}>{label}</span>
-      <span className="num text-right">{value}</span>
-    </div>
-  );
-}
 
 export function SaleDetailDrawer({
   saleId,
@@ -78,12 +42,13 @@ export function SaleDetailDrawer({
   saleId: string | null;
   onClose: () => void;
 }) {
-  const { db, recordPayment, toast } = useStore();
+  const { db, recordPayment, requestSaleDelete, toast } = useStore();
   const [payOpen, setPayOpen] = useState(false);
   const [payDate, setPayDate] = useState(TODAY);
   const [payAmt, setPayAmt] = useState(0);
   const [payMethod, setPayMethod] = useState("Transfer");
   const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const sale = db.sales.find((s) => s.id === saleId) ?? null;
 
@@ -93,15 +58,35 @@ export function SaleDetailDrawer({
   const pendingRevision = db.approvals.some(
     (a) => a.kind === "sale" && a.saleId === sale.id && a.status === "Menunggu",
   );
+  const pendingDelete = db.approvals.find(
+    (a) =>
+      a.kind === "saleDelete" &&
+      a.saleId === sale.id &&
+      a.status === "Menunggu",
+  );
+  const locked = Boolean(pendingDelete);
 
-  const rem = saleTotal(sale) - salePaid(sale);
+  const total = saleTotal(sale);
+  const paid = salePaid(sale);
+  const rem = total - paid;
   const proposed = saleProposed(sale);
   const status = arStatus(sale);
-  const methods = sale.payments.length
-    ? [...new Set(sale.payments.map((p) => p.method))].join(", ")
-    : sale.type === "tempo"
-      ? `Tempo s/d ${formatDate(sale.due)}`
-      : "Tunai";
+  const paidPct = total > 0 ? Math.min(100, (paid / total) * 100) : 0;
+
+  const customer =
+    db.customers.find((c) => c.id === sale.customerId) ??
+    db.customers.find((c) => c.name === sale.customer) ??
+    null;
+  const customerSt = customer ? customerStatus(customer) : "Aktif";
+  const overdue = overdueSales(db, {
+    id: sale.customerId,
+    name: sale.customer,
+  });
+  const creator =
+    db.approvals.find((a) => a.kind === "invoice" && a.saleId === sale.id)
+      ?.user ??
+    db.user ??
+    "—";
 
   const submitPayment = () => {
     const res = recordPayment(sale.id, {
@@ -116,166 +101,291 @@ export function SaleDetailDrawer({
     }
   };
 
+  const copyId = () => {
+    if (!navigator.clipboard) {
+      toast("Browser tidak mendukung salin");
+      return;
+    }
+    navigator.clipboard
+      .writeText(sale.id)
+      .then(() => toast("Nomor invoice disalin"))
+      .catch(() => toast("Gagal menyalin nomor invoice"));
+  };
+
+  const actionIcon = (path: string) => (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      dangerouslySetInnerHTML={{ __html: path }}
+    />
+  );
+
   return (
-    <Drawer
-      open={Boolean(saleId)}
-      onClose={onClose}
-      title="Detail Penjualan"
-      footer={
-        <>
-          {!editOpen && !pendingRevision && (
+    <>
+      <Drawer
+        open={Boolean(saleId)}
+        onClose={onClose}
+        narrow
+        title={`Detail penjualan ${sale.id}`}
+        header={
+          <div>
+            <div className="dkick">DETAIL PENJUALAN</div>
+            <div className="sale-head-idrow">
+              <h3 className="dtitle sale-head-id">{sale.id}</h3>
+              <button
+                type="button"
+                className="sale-copy"
+                onClick={copyId}
+                aria-label="Salin nomor invoice"
+              >
+                {actionIcon(ICON.copy)}
+              </button>
+            </div>
+            <div className="sale-head-meta">
+              {formatDate(sale.date)} ·{" "}
+              {sale.type === "tempo" ? "Tempo" : "Tunai"} · dicatat oleh{" "}
+              {creator}
+            </div>
+          </div>
+        }
+        footer={
+          <div className="sale-actions">
             <button
               type="button"
-              className="btn"
+              className="btn sale-act"
+              disabled={pendingRevision || locked || editOpen}
               onClick={() => setEditOpen(true)}
             >
-              Ubah harga &amp; biaya
+              {actionIcon(ICON.pencil)}
+              Ubah harga
             </button>
-          )}
-          {rem > 0 && !payOpen && !editOpen && (
+            <Link href={`/invoice/${sale.id}`} className="btn sale-act" onClick={onClose}>
+              {actionIcon(ICON.doc)}
+              Invoice
+            </Link>
             <button
               type="button"
-              className="btn"
+              className="btn soft-danger sale-act"
+              disabled={locked}
               onClick={() => {
-                setPayOpen(true);
-                setPayAmt(rem);
+                setEditOpen(false);
+                setPayOpen(false);
+                setDeleteOpen(true);
               }}
             >
-              Catat pembayaran
+              {actionIcon(ICON.trash)}
+              Ajukan hapus
             </button>
-          )}
-          <Link href={`/invoice/${sale.id}`} className="btn" onClick={onClose}>
-            Lihat invoice
-          </Link>
-          <button type="button" className="btn p" onClick={onClose}>
-            Tutup
-          </button>
-        </>
-      }
-    >
-      <div className="sdtop">
-        <div>
-          <div className="text-xs" style={{ color: "var(--mu)" }}>
-            No. Penjualan
-          </div>
-          <div className="font-extrabold text-lg" style={{ color: "var(--nv)" }}>
-            {sale.id}
-          </div>
-        </div>
-        <Badge tone={status}>{status}</Badge>
-      </div>
-
-      {pendingRevision && (
-        <div
-          className="sim"
-          style={{
-            background: "var(--wab)",
-            borderColor: "#f6e4a6",
-            color: "var(--wa)",
-          }}
-        >
-          Pengajuan ubah harga &amp; biaya invoice ini menunggu approval Owner.
-        </div>
-      )}
-
-      <div className="sdc">
-        <Head icon={ICONS.user} title="Pelanggan" />
-        <div className="font-bold">{sale.customer}</div>
-        <div className="text-[13px] mt-0.5" style={{ color: "var(--mu)" }}>
-          {sale.type === "tempo"
-            ? `Pembayaran tempo · jatuh tempo ${formatDate(sale.due)}`
-            : "Pembayaran tunai"}
-        </div>
-      </div>
-
-      <div className="sdc">
-        <Head icon={ICONS.shop} title="Rainbow Kids Official" extra={`${sale.items.length} item`} />
-        {sale.items.map((i) => {
-          const name = variantLabel(db, i.vid);
-          return (
-            <div className="sdp" key={i.vid}>
-              <div className="sdth">{initials(name)}</div>
-              <div className="flex-1 min-w-0">
-                <div className="font-bold text-[14px]" style={{ color: "var(--nv)" }}>
-                  {name}
-                </div>
-                <div className="text-[12.5px]" style={{ color: "var(--mu)" }}>
-                  {i.qty} × {rp(i.price)} · <span>modal {rp(i.cost)}</span>
-                </div>
-                <div
-                  className="text-[12.5px]"
-                  style={{
-                    color: itemProfit(i) >= 0 ? "var(--ok)" : "var(--er)",
-                  }}
-                >
-                  laba {rp(itemProfit(i))}/unit · total {rp(itemProfit(i) * i.qty)}
-                </div>
-              </div>
-              <div className="font-bold num whitespace-nowrap" style={{ color: "var(--nv)" }}>
-                {rp(i.qty * i.price)}
-              </div>
-            </div>
-          );
-        })}
-        <div
-          className="text-[13px] mt-2 pt-2 border-t"
-          style={{ borderColor: "var(--ln)" }}
-        >
-          <Row label="Subtotal produk" value={rp(saleSub(sale))} />
-          <Row label="Ongkir" value={rp(sale.ship)} />
-          <Row label="Packing" value={rp(sale.pack)} />
-          {+sale.other ? <Row label="Biaya lain" value={rp(sale.other)} /> : null}
-        </div>
-        <div className="sdtot">
-          <span>Total Penjualan</span>
-          <span className="num">{rp(saleTotal(sale))}</span>
-        </div>
-      </div>
-
-      <div className="sdc">
-        <Head icon={ICONS.cash} title="Metode Pembayaran" extra={methods} />
-        <div className="text-[13px]">
-          {sale.payments.length ? (
-            sale.payments.map((p, i) => (
-              <div key={i}>
-                <Row
-                  label={`${formatDate(p.date)} · ${p.method}`}
-                  value={rp(p.amt)}
-                />
-                {p.status === "Diajukan" && (
-                  <div className="flex justify-end">
-                    <Badge tone="Menunggu Pelunasan">
-                      Menunggu approval Owner
-                    </Badge>
-                  </div>
-                )}
-              </div>
-            ))
-          ) : (
-            <div className="py-1" style={{ color: "var(--mu)" }}>
-              Belum ada pembayaran
-            </div>
-          )}
-          <div className="border-t mt-1 pt-2">
-            <Row
-              label={<b style={{ color: "var(--tx)" }}>Sisa tagihan</b>}
-              value={
-                <b style={{ color: rem > 0 ? "var(--er)" : "var(--ok)" }}>
-                  {rp(Math.max(rem, 0))}
-                </b>
-              }
-            />
-            {proposed > 0 && (
-              <Row
-                label="Pengajuan pelunasan (menunggu approval)"
-                value={rp(proposed)}
-              />
+            {rem > 0 ? (
+              <button
+                type="button"
+                className="btn p sale-primary"
+                disabled={locked || payOpen || editOpen}
+                onClick={() => {
+                  setPayOpen(true);
+                  setPayAmt(rem);
+                }}
+              >
+                {actionIcon(ICON.card)}
+                Catat pembayaran
+              </button>
+            ) : (
+              <Link
+                href={`/invoice/${sale.id}`}
+                className="btn p sale-primary"
+                onClick={onClose}
+              >
+                {actionIcon(ICON.doc)}
+                Lihat invoice
+              </Link>
             )}
           </div>
+        }
+      >
+        {locked && pendingDelete && (
+          <div className="sale-banner danger mb-3">
+            <b>Pengajuan hapus order menunggu approval Owner.</b>
+            {pendingDelete.reason ? ` Alasan: ${pendingDelete.reason}.` : ""}{" "}
+            Ubah harga dan catat pembayaran dikunci sementara.
+          </div>
+        )}
+
+        {pendingRevision && (
+          <div className="sale-banner warn mb-3">
+            Pengajuan ubah harga &amp; biaya invoice ini menunggu approval Owner.
+          </div>
+        )}
+
+        <div className="sale-summary">
+          <div className="sale-summary-top">
+            <div>
+              <div className="sale-summary-label">Total tagihan</div>
+              <div className="sale-summary-total num">{rp(total)}</div>
+            </div>
+            <span className="bd b-ac">
+              {status}
+              {sale.type === "tempo" && sale.due
+                ? ` · ${formatDate(sale.due)}`
+                : ""}
+            </span>
+          </div>
+          <div className="sale-progress" aria-hidden="true">
+            <span style={{ width: `${paidPct}%` }} />
+          </div>
+          <div className="sale-metrics">
+            <div className="sale-metric">
+              <div className="l">Dibayar</div>
+              <div className="v num">{rp(paid)}</div>
+            </div>
+            <div className="sale-metric">
+              <div className="l">Sisa</div>
+              <div className="v num gold">{rp(Math.max(rem, 0))}</div>
+            </div>
+            <div className="sale-metric">
+              <div className="l">Laba order</div>
+              <div className="v num ok">{rp(saleProfit(sale))}</div>
+            </div>
+          </div>
         </div>
 
-        {payOpen && (
-          <div className="mt-3 p-3 rounded-xl" style={{ background: "#F5F7FB" }}>
+        <div className="sale-customer mt-3">
+          <div className="sale-cust-av">{initials(sale.customer)}</div>
+          <div className="min-w-0 flex-1">
+            <div className="font-bold text-[14px]" style={{ color: "var(--nv)" }}>
+              {sale.customer}
+            </div>
+            <div className="text-[11.5px]" style={{ color: "var(--mu)" }}>
+              {customer?.type ?? "Pelanggan"}
+              {customer?.phone ? ` · ${customer.phone}` : ""}
+            </div>
+            <div className="flex flex-wrap gap-1 mt-1">
+              {customerSt === "Menunggu" && (
+                <span className="bd b-wa">Menunggu approval</span>
+              )}
+              {customerSt === "Diarsipkan" && (
+                <span className="bd b-in">Diarsipkan</span>
+              )}
+              {overdue.length > 0 && (
+                <span className="bd b-er">Ada tunggakan</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="sale-sec-head">
+          <span>Barang</span>
+          <span className="sale-sec-sub">
+            {sale.items.length} item ·{" "}
+            {sale.items.reduce((a, i) => a + i.qty, 0)} pcs
+          </span>
+        </div>
+        <div>
+          {sale.items.map((i, idx) => {
+            const name = variantLabel(db, i.vid);
+            const profit = itemProfit(i);
+            return (
+              <div className="sale-item" key={`${i.vid}-${idx}`}>
+                <div className="sale-thumb">{initials(name)}</div>
+                <div className="flex-1 min-w-0">
+                  <div
+                    className="font-bold text-[13.5px]"
+                    style={{ color: "var(--nv)" }}
+                  >
+                    {name}
+                  </div>
+                  <div className="text-[11.5px]" style={{ color: "var(--mu)" }}>
+                    {i.qty} × {rp(i.price)} · modal {rp(i.cost)}
+                  </div>
+                  <span
+                    className={`sale-margin ${profit >= 0 ? "pos" : "neg"}`}
+                  >
+                    {profit >= 0 ? "+" : "−"}
+                    {rp(Math.abs(profit))} / unit
+                  </span>
+                </div>
+                <div
+                  className="num font-bold whitespace-nowrap text-[13.5px]"
+                  style={{ color: "var(--nv)" }}
+                >
+                  {rp(i.qty * i.price)}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="sale-cost">
+          <div className="sale-cost-row">
+            <span>Subtotal produk</span>
+            <span className="num">{rp(saleSub(sale))}</span>
+          </div>
+          <div className="sale-cost-row">
+            <span>Ongkir</span>
+            <span className="num">{rp(sale.ship)}</span>
+          </div>
+          <div className="sale-cost-row">
+            <span>Packing</span>
+            <span className="num">{rp(sale.pack)}</span>
+          </div>
+          {+sale.other > 0 && (
+            <div className="sale-cost-row">
+              <span>Biaya lain</span>
+              <span className="num">{rp(sale.other)}</span>
+            </div>
+          )}
+          <div className="sale-cost-total">
+            <span>Total penjualan</span>
+            <span className="num">{rp(total)}</span>
+          </div>
+        </div>
+
+        <div className="sale-sec-head">
+          <span>Pembayaran</span>
+          <span className="sale-sec-sub">
+            {proposed > 0 ? "Ada pengajuan menunggu" : `${rp(paid)} dibayar`}
+          </span>
+        </div>
+
+        {sale.payments.length === 0 ? (
+          <div className="sale-empty-pay">Belum ada pembayaran</div>
+        ) : (
+          <div>
+            {sale.payments.map((p, i) => (
+              <div className="sale-pay-row" key={i}>
+                <div className="min-w-0">
+                  <div style={{ color: "var(--nv)" }}>
+                    {formatDate(p.date)} · {p.method}
+                  </div>
+                  {p.status === "Diajukan" && (
+                    <Badge tone="Menunggu">Menunggu approval</Badge>
+                  )}
+                  {p.status === "Ditolak" && (
+                    <Badge tone="Ditolak">Ditolak</Badge>
+                  )}
+                </div>
+                <b className="num" style={{ color: "var(--nv)" }}>
+                  {rp(p.amt)}
+                </b>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {proposed > 0 && (
+          <div className="sale-banner warn mt-2">
+            Pengajuan pelunasan {rp(proposed)} menunggu approval Owner.
+          </div>
+        )}
+
+        {payOpen && !locked && (
+          <div className="sale-pay-form">
             <div className="text-sm mb-3">
               Sisa tagihan <b className="num">{rp(rem)}</b>
             </div>
@@ -305,7 +415,11 @@ export function SaleDetailDrawer({
               </div>
             </div>
             <div className="flex gap-2 mt-3">
-              <button type="button" className="btn s" onClick={() => setPayOpen(false)}>
+              <button
+                type="button"
+                className="btn s"
+                onClick={() => setPayOpen(false)}
+              >
                 Batal
               </button>
               <button type="button" className="btn s p" onClick={submitPayment}>
@@ -320,61 +434,48 @@ export function SaleDetailDrawer({
             )}
           </div>
         )}
-      </div>
 
-      <div className="sdc">
-        <Head icon={ICONS.trend} title="Perhitungan Laba" />
-        <div className="text-[13px]">
-          <Row label="Total penjualan" value={rp(saleSub(sale))} />
-          <Row label="− Modal barang" value={rp(saleCost(sale))} />
-          <Row label="− Ongkir + packing + lain" value={rp(saleOps(sale))} />
+        <div className="sale-sec-head">
+          <span>Perhitungan laba</span>
         </div>
-        <div
-          className="mt-2 pt-2 border-t text-[12.5px]"
-          style={{ borderColor: "var(--ln)" }}
-        >
-          {sale.items.map((i) => (
-            <div key={i.vid} className="flex justify-between gap-3 py-0.5">
-              <span style={{ color: "var(--mu)" }}>
-                {variantLabel(db, i.vid)} · {i.qty} × {rp(i.price)}
-              </span>
-              <span className="num whitespace-nowrap">
-                {rp(itemProfit(i))}/unit
-              </span>
-            </div>
-          ))}
+        <div className="sale-profit-lines">
+          <div>
+            <span>Total penjualan</span>
+            <span className="num">{rp(saleSub(sale))}</span>
+          </div>
+          <div>
+            <span>− Modal barang</span>
+            <span className="num">{rp(saleCost(sale))}</span>
+          </div>
+          <div>
+            <span>− Ongkir + packing + lain</span>
+            <span className="num">{rp(saleOps(sale))}</span>
+          </div>
         </div>
-        <div className="sdprof">
+        <div className="sale-profit-box">
           <span>Laba order</span>
           <span className="num">{rp(saleProfit(sale))}</span>
         </div>
-      </div>
 
-      <div className="text-[13px] px-1">
-        <Row label="No. Penjualan" value={<b style={{ color: "var(--nv)" }}>{sale.id}</b>} />
-        <Row
-          label="Tanggal transaksi"
-          value={<b style={{ color: "var(--nv)" }}>{formatDate(sale.date)}</b>}
-        />
-        <Row
-          label="Jenis pembayaran"
-          value={
-            <b style={{ color: "var(--nv)" }}>
-              {sale.type === "tempo" ? "Tempo" : "Tunai"}
-            </b>
-          }
-        />
-        {sale.type === "tempo" && (
-          <Row
-            label="Jatuh tempo"
-            value={<b style={{ color: "var(--nv)" }}>{formatDate(sale.due)}</b>}
-          />
+        {editOpen && !locked && (
+          <SaleEditPanel sale={sale} onClose={() => setEditOpen(false)} />
         )}
-      </div>
+      </Drawer>
 
-      {editOpen && (
-        <SaleEditPanel sale={sale} onClose={() => setEditOpen(false)} />
-      )}
-    </Drawer>
+      <ReasonDialog
+        key={`delete-sale-${sale.id}`}
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        title="Ajukan hapus order"
+        description={`Order ${sale.id} milik ${sale.customer} akan dihapus setelah disetujui Owner. Stok setiap barang dikembalikan dan approval ubah harga/pelunasan yang masih menunggu otomatis ditolak.`}
+        placeholder="Contoh: order dibatalkan pelanggan / salah input"
+        onConfirm={(reason) => {
+          const res = requestSaleDelete(sale.id, reason);
+          toast(res.msg);
+          if (res.ok) setDeleteOpen(false);
+          return res;
+        }}
+      />
+    </>
   );
 }

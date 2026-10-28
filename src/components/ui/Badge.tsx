@@ -13,6 +13,8 @@ const STATUS_CLASS: Record<string, string> = {
   Disetujui: "b-ok",
   Ditolak: "b-er",
   Draft: "b-in",
+  Aktif: "b-ok",
+  Diarsipkan: "b-in",
   Tempo: "b-in",
   Tunai: "b-ac",
   Minus: "b-er",

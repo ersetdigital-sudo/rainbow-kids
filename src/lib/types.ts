@@ -32,6 +32,8 @@ export type Product = {
 
 export type CustomerType = "Toko" | "Reseller" | "Ritel";
 
+export type CustomerStatus = "Menunggu" | "Aktif" | "Diarsipkan";
+
 export type Customer = {
   id: string;
   name: string;
@@ -40,6 +42,8 @@ export type Customer = {
   address?: string;
   /** Rekening tujuan transfer khusus pelanggan ini (tampil di invoice). */
   bank?: string;
+  /** Opsional; data lama tanpa status dianggap "Aktif". */
+  status?: CustomerStatus;
 };
 
 export type Supplier = {
@@ -122,7 +126,17 @@ export type ApprovalKind =
   | "sale"
   | "nota"
   | "notaEdit"
-  | "invoice";
+  | "invoice"
+  | "customer"
+  | "customerDelete"
+  | "saleDelete";
+
+/** Ringkasan tunggakan toko saat invoice diajukan. */
+export type SaleOverdueSummary = {
+  count: number;
+  total: number;
+  ids: string[];
+};
 
 /** Usulan invoice penjualan baru — baru tercatat setelah disetujui Owner. */
 export type SaleRequest = {
@@ -136,6 +150,7 @@ export type SaleRequest = {
   pack: number;
   other: number;
   paid: number;
+  overdue?: SaleOverdueSummary;
 };
 
 /** Usulan perubahan harga jual / biaya sebuah invoice. */
@@ -177,6 +192,15 @@ export type Approval = {
   after: string | number;
   saleId?: string;
   purchaseId?: string;
+  /** Pelanggan terkait approval kind "customer" / "customerDelete". */
+  customerId?: string;
+  customerName?: string;
+  /** Alasan pengajuan hapus pelanggan / order. */
+  reason?: string;
+  /** Snapshot penjualan saat pengajuan hapus order. */
+  saleSnapshot?: Sale;
+  /** Catatan keputusan otomatis, mis. "Order dihapus". */
+  note?: string;
   /** Rincian usulan untuk kind "sale". */
   revision?: SaleRevision;
   /** Rincian invoice baru untuk kind "invoice". */

@@ -11,7 +11,10 @@ import {
 import { TODAY, nowStamp } from "./date";
 import { uid } from "./format";
 import {
+  customerStatus,
+  overdueSales,
   purchaseTotal,
+  saleBelongsToCustomer,
   salePaid,
   saleProfit,
   saleProposed,
@@ -97,6 +100,18 @@ function isActiveUser(current: string, user: AppUser): boolean {
   return label === name || label === name.split(/\s+/)[0];
 }
 
+function hasPendingSaleDelete(
+  approvals: DB["approvals"],
+  saleId: string,
+): boolean {
+  return approvals.some(
+    (a) =>
+      a.kind === "saleDelete" &&
+      a.saleId === saleId &&
+      a.status === "Menunggu",
+  );
+}
+
 const StoreContext = createContext<StoreValue | null>(null);
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
@@ -159,9 +174,33 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         phone: c.phone?.trim() || undefined,
         address: c.address?.trim() || undefined,
         bank: c.bank?.trim() || undefined,
+        status: "Menunggu",
       };
-      setSnapshot((prev) => ({ ...prev, customers: [...prev.customers, customer] }));
-      return { ok: true, msg: `Pelanggan ${name} ditambahkan`, customer };
+      const time = nowStamp();
+      setSnapshot((prev) => ({
+        ...prev,
+        customers: [...prev.customers, customer],
+        approvals: [
+          ...prev.approvals,
+          {
+            id: `AP-${String(prev.approvals.length + 1).padStart(3, "0")}`,
+            kind: "customer" as const,
+            type: "Pelanggan baru",
+            before: "—",
+            after: "Menunggu",
+            customerId: customer.id,
+            customerName: customer.name,
+            user: prev.user,
+            time,
+            status: "Menunggu" as const,
+          },
+        ],
+      }));
+      return {
+        ok: true,
+        msg: `Pelanggan ${name} ditambahkan — menunggu approval Owner`,
+        customer,
+      };
     },
     [],
   );
@@ -205,6 +244,61 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  /** Ajukan hapus toko; dieksekusi setelah disetujui Owner. */
+  const requestCustomerDelete = useCallback<
+    StoreValue["requestCustomerDelete"]
+  >((customerId, reason) => {
+    const note = reason.trim();
+    if (!note) return { ok: false, msg: "Isi alasan hapus toko" };
+
+    const current = getSnapshot();
+    const customer = current.customers.find((c) => c.id === customerId);
+    if (!customer) return { ok: false, msg: "Pelanggan tidak ditemukan" };
+
+    const outstanding = current.sales.some(
+      (s) =>
+        saleBelongsToCustomer(s, customer) &&
+        saleTotal(s) - salePaid(s) > 0,
+    );
+    if (outstanding)
+      return { ok: false, msg: "Toko masih punya tagihan belum lunas" };
+
+    if (
+      current.approvals.some(
+        (a) =>
+          a.kind === "customerDelete" &&
+          a.customerId === customerId &&
+          a.status === "Menunggu",
+      )
+    )
+      return {
+        ok: false,
+        msg: "Sudah ada pengajuan hapus yang menunggu untuk toko ini",
+      };
+
+    const time = nowStamp();
+    setSnapshot((prev) => ({
+      ...prev,
+      approvals: [
+        ...prev.approvals,
+        {
+          id: `AP-${String(prev.approvals.length + 1).padStart(3, "0")}`,
+          kind: "customerDelete" as const,
+          type: "Hapus pelanggan",
+          before: customerStatus(customer),
+          after: "Dihapus",
+          customerId,
+          customerName: customer.name,
+          reason: note,
+          user: prev.user,
+          time,
+          status: "Menunggu" as const,
+        },
+      ],
+    }));
+    return { ok: true, msg: "Pengajuan hapus toko dikirim ke Owner" };
+  }, []);
+
   const addSupplier = useCallback<StoreValue["addSupplier"]>(
     (s) => {
       const name = s.name.trim();
@@ -233,6 +327,33 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (!draft.items.length)
       return { ok: false, msg: "Tambahkan minimal satu barang" };
 
+    const customer =
+      (draft.customerId &&
+        current.customers.find((c) => c.id === draft.customerId)) ||
+      current.customers.find(
+        (c) => c.name.toLowerCase() === draft.customer.trim().toLowerCase(),
+      );
+    if (customer && customerStatus(customer) === "Diarsipkan")
+      return {
+        ok: false,
+        msg: "Toko sudah diarsipkan dan tidak bisa dipilih",
+      };
+
+    const overdue = overdueSales(current, {
+      id: draft.customerId ?? customer?.id,
+      name: draft.customer.trim(),
+    });
+    const overdueSummary = overdue.length
+      ? {
+          count: overdue.length,
+          total: overdue.reduce(
+            (sum, s) => sum + Math.max(saleTotal(s) - salePaid(s), 0),
+            0,
+          ),
+          ids: overdue.map((s) => s.id),
+        }
+      : undefined;
+
     // Harga jual bebas diisi (rentang hanya jadi acuan/histori, tidak memblokir).
     const items: SaleItem[] = draft.items.map((i) => {
       const v = current.products
@@ -251,6 +372,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       pack: draft.pack,
       other: draft.other,
       paid: draft.paid,
+      overdue: overdueSummary,
     };
 
     // Peringatan stok minus dipakai sebagai catatan saat Owner meninjau.
@@ -300,6 +422,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const current = getSnapshot();
       const sale = current.sales.find((s) => s.id === saleId);
       if (!sale) return { ok: false, msg: "Invoice tidak ditemukan" };
+      if (hasPendingSaleDelete(current.approvals, saleId))
+        return {
+          ok: false,
+          msg: "Pengajuan hapus order sedang menunggu approval",
+        };
       if (
         current.approvals.some(
           (a) =>
@@ -365,6 +492,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const current = getSnapshot();
       const sale = current.sales.find((s) => s.id === saleId);
       if (!sale) return { ok: false, msg: "Invoice tidak ditemukan" };
+      if (hasPendingSaleDelete(current.approvals, saleId))
+        return {
+          ok: false,
+          msg: "Pengajuan hapus order sedang menunggu approval",
+        };
       const rem = saleTotal(sale) - salePaid(sale);
       if (p.amt <= 0) return { ok: false, msg: "Jumlah tidak valid" };
       if (rem <= 0) return { ok: false, msg: "Invoice ini sudah lunas" };
@@ -438,6 +570,51 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         ),
       }));
       return { ok: true, msg: "Pembayaran dicatat" };
+    },
+    [],
+  );
+
+  /** Ajukan hapus order penjualan; snapshot disimpan untuk audit. */
+  const requestSaleDelete = useCallback<StoreValue["requestSaleDelete"]>(
+    (saleId, reason) => {
+      const note = reason.trim();
+      if (!note) return { ok: false, msg: "Isi alasan hapus order" };
+
+      const current = getSnapshot();
+      const sale = current.sales.find((s) => s.id === saleId);
+      if (!sale) return { ok: false, msg: "Penjualan tidak ditemukan" };
+      if (hasPendingSaleDelete(current.approvals, saleId))
+        return {
+          ok: false,
+          msg: "Sudah ada pengajuan hapus untuk order ini",
+        };
+
+      const snapshot: Sale = {
+        ...sale,
+        items: sale.items.map((i) => ({ ...i })),
+        payments: sale.payments.map((p) => ({ ...p })),
+      };
+      const time = nowStamp();
+      setSnapshot((prev) => ({
+        ...prev,
+        approvals: [
+          ...prev.approvals,
+          {
+            id: `AP-${String(prev.approvals.length + 1).padStart(3, "0")}`,
+            kind: "saleDelete" as const,
+            type: "Hapus penjualan",
+            saleId,
+            before: saleTotal(sale),
+            after: "Dihapus",
+            saleSnapshot: snapshot,
+            reason: note,
+            user: prev.user,
+            time,
+            status: "Menunggu" as const,
+          },
+        ],
+      }));
+      return { ok: true, msg: "Pengajuan hapus order dikirim ke Owner" };
     },
     [],
   );
@@ -818,6 +995,119 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setSnapshot((prev) => {
       const a = prev.approvals.find((x) => x.id === id);
       if (!a) return prev;
+
+      // Pelanggan baru — disetujui jadi Aktif, ditolak jadi Diarsipkan.
+      if (a.kind === "customer") {
+        return {
+          ...prev,
+          customers: prev.customers.map((c) =>
+            c.id === a.customerId
+              ? {
+                  ...c,
+                  status: ok ? ("Aktif" as const) : ("Diarsipkan" as const),
+                }
+              : c,
+          ),
+          approvals: prev.approvals.map((x) =>
+            x.id === id
+              ? { ...x, status: ok ? "Disetujui" : "Ditolak", by: prev.user, decidedAt }
+              : x,
+          ),
+        };
+      }
+
+      // Hapus pelanggan — hapus permanen jika belum pernah transaksi,
+      // selain itu arsipkan supaya riwayat transaksi tetap utuh.
+      if (a.kind === "customerDelete") {
+        let customers = prev.customers;
+        if (ok && a.customerId) {
+          const customer = prev.customers.find((c) => c.id === a.customerId);
+          if (customer) {
+            const hasSales = prev.sales.some((s) =>
+              saleBelongsToCustomer(s, customer),
+            );
+            customers = hasSales
+              ? prev.customers.map((c) =>
+                  c.id === customer.id
+                    ? { ...c, status: "Diarsipkan" as const }
+                    : c,
+                )
+              : prev.customers.filter((c) => c.id !== customer.id);
+          }
+        }
+        return {
+          ...prev,
+          customers,
+          approvals: prev.approvals.map((x) =>
+            x.id === id
+              ? { ...x, status: ok ? "Disetujui" : "Ditolak", by: prev.user, decidedAt }
+              : x,
+          ),
+        };
+      }
+
+      // Hapus order penjualan — stok dikembalikan dan approval terkait ditolak.
+      if (a.kind === "saleDelete") {
+        const sale = prev.sales.find((s) => s.id === a.saleId);
+        if (!ok || !sale)
+          return {
+            ...prev,
+            approvals: prev.approvals.map((x) =>
+              x.id === id
+                ? { ...x, status: ok ? "Disetujui" : "Ditolak", by: prev.user, decidedAt }
+                : x,
+            ),
+          };
+
+        const history = [...prev.history];
+        const products = prev.products.map((p) => ({
+          ...p,
+          variants: p.variants.map((v) => {
+            const qty = sale.items
+              .filter((i) => i.vid === v.id)
+              .reduce((sum, i) => sum + i.qty, 0);
+            return qty > 0 ? { ...v, stock: v.stock + qty } : v;
+          }),
+        }));
+        sale.items.forEach((i) => {
+          history.push({
+            vid: i.vid,
+            date: TODAY,
+            type: "Stok" as const,
+            desc: `Hapus ${sale.id} +${i.qty} (dibatalkan)`,
+            user: prev.user,
+          });
+        });
+
+        return {
+          ...prev,
+          products,
+          history,
+          sales: prev.sales.filter((s) => s.id !== sale.id),
+          approvals: prev.approvals.map((x) => {
+            if (x.id === id)
+              return {
+                ...x,
+                status: "Disetujui" as const,
+                by: prev.user,
+                decidedAt,
+              };
+            if (
+              x.status === "Menunggu" &&
+              x.saleId === sale.id &&
+              (x.kind === "sale" || x.kind === "payment")
+            )
+              return {
+                ...x,
+                status: "Ditolak" as const,
+                by: prev.user,
+                decidedAt,
+                note: "order dihapus",
+              };
+            return x;
+          }),
+        };
+      }
 
       // 0. Invoice penjualan baru — transaksi & stok baru berlaku setelah disetujui
       if (a.kind === "invoice") {
@@ -1295,10 +1585,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       updateBiz,
       addCustomer,
       updateCustomer,
+      requestCustomerDelete,
       addSupplier,
       saveSale,
       requestSaleRevision,
       recordPayment,
+      requestSaleDelete,
       addProduct,
       submitChange,
       savePurchase,
@@ -1322,10 +1614,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       updateBiz,
       addCustomer,
       updateCustomer,
+      requestCustomerDelete,
       addSupplier,
       saveSale,
       requestSaleRevision,
       recordPayment,
+      requestSaleDelete,
       addProduct,
       submitChange,
       savePurchase,
@@ -1381,6 +1675,7 @@ type StoreValue = {
       bank?: string;
     },
   ) => Result;
+  requestCustomerDelete: (customerId: string, reason: string) => Result;
   addSupplier: (s: { name: string; phone?: string; address?: string }) => Result;
   saveSale: (draft: SaleDraft) => Result;
   requestSaleRevision: (saleId: string, revision: SaleRevision) => Result;
@@ -1388,6 +1683,7 @@ type StoreValue = {
     saleId: string,
     p: { date: string; amt: number; method: string },
   ) => Result;
+  requestSaleDelete: (saleId: string, reason: string) => Result;
   addProduct: (p: {
     cat: string;
     name: string;

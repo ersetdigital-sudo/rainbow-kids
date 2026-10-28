@@ -21,7 +21,9 @@ export function Drawer({
   title,
   children,
   footer,
+  header,
   wide,
+  narrow,
   kicker = "Rainbow Kids",
 }: {
   open: boolean;
@@ -29,7 +31,10 @@ export function Drawer({
   title: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  /** Ganti isi header default (kicker + judul) bila perlu layout khusus. */
+  header?: React.ReactNode;
   wide?: boolean;
+  narrow?: boolean;
   kicker?: string;
 }) {
   const isMobile = useIsMobile();
@@ -67,7 +72,7 @@ export function Drawer({
           }}
         >
           <motion.div
-            className={`mbox ${wide ? "wide" : ""}`}
+            className={`mbox${wide ? " wide" : ""}${narrow ? " narrow" : ""}`}
             initial={hidden}
             animate={shown}
             exit={hidden}
@@ -79,10 +84,14 @@ export function Drawer({
             <div className="dhead">
               <div className="dgrip" />
               <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="dkick">{kicker}</div>
-                  <h3 className="dtitle">{title}</h3>
-                </div>
+                {header ? (
+                  <div className="min-w-0 flex-1">{header}</div>
+                ) : (
+                  <div>
+                    <div className="dkick">{kicker}</div>
+                    <h3 className="dtitle">{title}</h3>
+                  </div>
+                )}
                 <button
                   onClick={onClose}
                   className="dclose"

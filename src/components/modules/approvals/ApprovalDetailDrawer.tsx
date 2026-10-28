@@ -1,17 +1,66 @@
 "use client";
 
+import { useState } from "react";
 import { formatDate } from "@/lib/date";
 import { rp } from "@/lib/format";
 import {
+  customerStatus,
   itemProfit,
+  overdueSales,
   paymentPosition,
   purchaseTotal,
+  salePaid,
   saleRequestPosition,
+  saleTotal,
   variantLabel,
 } from "@/lib/calc";
 import { useStore } from "@/lib/store";
 import { Badge } from "@/components/ui/Badge";
 import { Drawer } from "@/components/ui/Drawer";
+import { Icon } from "@/components/ui/Icon";
+import { OverdueWarningDialog } from "@/components/ui/OverdueWarningDialog";
+import type { Approval } from "@/lib/types";
+
+function DecisionFooter({
+  approval,
+  onClose,
+}: {
+  approval: Approval;
+  onClose: () => void;
+}) {
+  const { decideApproval, toast } = useStore();
+  return (
+    <>
+      {approval.status === "Menunggu" && (
+        <>
+          <button
+            type="button"
+            className="btn d"
+            onClick={() => {
+              decideApproval(approval.id, false);
+              toast("Pengajuan ditolak");
+            }}
+          >
+            Tolak
+          </button>
+          <button
+            type="button"
+            className="btn p"
+            onClick={() => {
+              decideApproval(approval.id, true);
+              toast("Pengajuan disetujui");
+            }}
+          >
+            Setujui
+          </button>
+        </>
+      )}
+      <button type="button" className="btn" onClick={onClose}>
+        Tutup
+      </button>
+    </>
+  );
+}
 
 /**
  * Rincian pengajuan approval: isi satu nota belanja supplier
@@ -25,9 +74,305 @@ export function ApprovalDetailDrawer({
   onClose: () => void;
 }) {
   const { db } = useStore();
+  const [overdueWarnClosed, setOverdueWarnClosed] = useState(false);
   const a = db.approvals.find((x) => x.id === approvalId);
 
   if (!a) return null;
+
+  /* ---------------- Pelanggan baru ---------------- */
+  if (a.kind === "customer") {
+    const customer = db.customers.find((c) => c.id === a.customerId);
+    return (
+      <Drawer
+        open={Boolean(approvalId)}
+        onClose={onClose}
+        title="Detail pelanggan baru"
+        footer={<DecisionFooter approval={a} onClose={onClose} />}
+      >
+        <div className="sdtop">
+          <div>
+            <div className="text-xs" style={{ color: "var(--mu)" }}>
+              Pelanggan baru
+            </div>
+            <div
+              className="font-extrabold text-lg"
+              style={{ color: "var(--nv)" }}
+            >
+              {a.customerName ?? customer?.name ?? "-"}
+            </div>
+          </div>
+          <Badge tone={a.status}>{a.status}</Badge>
+        </div>
+
+        <div className="sdc">
+          <div className="sdh">
+            <span className="sdi">
+              <Icon name="cust" />
+            </span>
+            <span>Data pelanggan</span>
+          </div>
+          <div className="text-[13px]">
+            <div className="flex justify-between py-1.5">
+              <span style={{ color: "var(--mu)" }}>Jenis</span>
+              <b style={{ color: "var(--nv)" }}>{customer?.type ?? "-"}</b>
+            </div>
+            <div className="flex justify-between py-1.5">
+              <span style={{ color: "var(--mu)" }}>No. HP</span>
+              <b style={{ color: "var(--nv)" }}>{customer?.phone ?? "-"}</b>
+            </div>
+            <div className="flex justify-between gap-4 py-1.5">
+              <span style={{ color: "var(--mu)" }}>Alamat</span>
+              <b className="text-right" style={{ color: "var(--nv)" }}>
+                {customer?.address ?? "-"}
+              </b>
+            </div>
+          </div>
+        </div>
+
+        <div className="sim">
+          Disetujui: pelanggan menjadi Aktif. Ditolak: pelanggan diarsipkan dan
+          tidak bisa dipilih di transaksi baru.
+        </div>
+
+        <div className="text-[13px] px-1 mt-3">
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>Diajukan</span>
+            <b style={{ color: "var(--nv)" }}>{a.user}</b>
+          </div>
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>Waktu</span>
+            <b style={{ color: "var(--nv)" }}>{a.time}</b>
+          </div>
+          {a.decidedAt && (
+            <div className="flex justify-between py-1.5">
+              <span style={{ color: "var(--mu)" }}>Diputuskan</span>
+              <b style={{ color: "var(--nv)" }}>
+                {a.decidedAt}
+                {a.by ? ` oleh ${a.by}` : ""}
+              </b>
+            </div>
+          )}
+        </div>
+      </Drawer>
+    );
+  }
+
+  /* ---------------- Hapus pelanggan ---------------- */
+  if (a.kind === "customerDelete") {
+    const customer = db.customers.find((c) => c.id === a.customerId);
+    const custStatus = customer ? customerStatus(customer) : null;
+    const hasSales = customer
+      ? db.sales.some((s) => s.customerId === customer.id || s.customer === customer.name)
+      : false;
+    return (
+      <Drawer
+        open={Boolean(approvalId)}
+        onClose={onClose}
+        title="Detail hapus pelanggan"
+        footer={<DecisionFooter approval={a} onClose={onClose} />}
+      >
+        <div className="sdtop">
+          <div>
+            <div className="text-xs" style={{ color: "var(--mu)" }}>
+              Pengajuan hapus · {custStatus ?? "-"}
+            </div>
+            <div
+              className="font-extrabold text-lg"
+              style={{ color: "var(--nv)" }}
+            >
+              {a.customerName ?? customer?.name ?? "-"}
+            </div>
+          </div>
+          <Badge tone={a.status}>{a.status}</Badge>
+        </div>
+
+        <div className="sdc">
+          <div className="sdh">
+            <span className="sdi">
+              <Icon name="cust" />
+            </span>
+            <span>Alasan pengajuan</span>
+          </div>
+          <div className="text-[13px]" style={{ color: "var(--tx)" }}>
+            {a.reason || "-"}
+          </div>
+        </div>
+
+        <div className="sim">
+          Disetujui: {hasSales ? "pelanggan diarsipkan karena sudah punya transaksi." : "pelanggan dihapus permanen karena belum pernah transaksi."} Ditolak: data pelanggan tetap seperti semula.
+        </div>
+
+        <div className="text-[13px] px-1 mt-3">
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>Diajukan</span>
+            <b style={{ color: "var(--nv)" }}>{a.user}</b>
+          </div>
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>Waktu</span>
+            <b style={{ color: "var(--nv)" }}>{a.time}</b>
+          </div>
+          {a.decidedAt && (
+            <div className="flex justify-between py-1.5">
+              <span style={{ color: "var(--mu)" }}>Diputuskan</span>
+              <b style={{ color: "var(--nv)" }}>
+                {a.decidedAt}
+                {a.by ? ` oleh ${a.by}` : ""}
+              </b>
+            </div>
+          )}
+        </div>
+      </Drawer>
+    );
+  }
+
+  /* ---------------- Hapus order penjualan ---------------- */
+  if (a.kind === "saleDelete") {
+    const snapshot = a.saleSnapshot;
+    const sale = snapshot ?? db.sales.find((s) => s.id === a.saleId) ?? null;
+    return (
+      <Drawer
+        open={Boolean(approvalId)}
+        onClose={onClose}
+        title="Detail hapus penjualan"
+        footer={<DecisionFooter approval={a} onClose={onClose} />}
+      >
+        <div className="sdtop">
+          <div>
+            <div className="text-xs" style={{ color: "var(--mu)" }}>
+              {sale ? `${formatDate(sale.date)} · ${sale.type === "tempo" ? "Tempo" : "Tunai"}` : "Order"}
+            </div>
+            <div
+              className="font-extrabold text-lg"
+              style={{ color: "var(--nv)" }}
+            >
+              {sale?.id ?? a.saleId ?? "-"}
+            </div>
+            <div className="text-[12.5px]" style={{ color: "var(--mu)" }}>
+              {sale?.customer ?? "-"}
+            </div>
+          </div>
+          <Badge tone={a.status}>{a.status}</Badge>
+        </div>
+
+        <div className="sdc">
+          <div className="sdh">
+            <span className="sdi">
+              <Icon name="sales" />
+            </span>
+            <span>Alasan pengajuan</span>
+          </div>
+          <div className="text-[13px]" style={{ color: "var(--tx)" }}>
+            {a.reason || "-"}
+          </div>
+        </div>
+
+        {sale && (
+          <>
+            <div className="sdc">
+              <div className="sdh">
+                <span className="sdi">
+                  <Icon name="stock" />
+                </span>
+                <span>Snapshot barang</span>
+                <span className="ml-auto font-semibold" style={{ color: "var(--nv)" }}>
+                  {sale.items.length} jenis
+                </span>
+              </div>
+              {sale.items.map((i) => (
+                <div
+                  key={i.vid}
+                  className="flex justify-between gap-3 py-2 border-b"
+                  style={{ borderColor: "var(--ln)" }}
+                >
+                  <div className="min-w-0">
+                    <div className="font-semibold text-[13.5px]" style={{ color: "var(--nv)" }}>
+                      {variantLabel(db, i.vid)}
+                    </div>
+                    <div className="text-[12px]" style={{ color: "var(--mu)" }}>
+                      {i.qty} × {rp(i.price)} · modal {rp(i.cost)}
+                    </div>
+                  </div>
+                  <div className="text-right whitespace-nowrap">
+                    <div className="num font-semibold" style={{ color: "var(--nv)" }}>
+                      {rp(i.qty * i.price)}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <div className="sdtot">
+                <span>Total penjualan</span>
+                <span className="num">{rp(saleTotal(sale))}</span>
+              </div>
+            </div>
+
+            <div className="sdc">
+              <div className="sdh">
+                <span className="sdi">
+                  <Icon name="ar" />
+                </span>
+                <span>Snapshot pembayaran</span>
+                <span className="ml-auto font-semibold" style={{ color: "var(--nv)" }}>
+                  {rp(salePaid(sale))} dibayar
+                </span>
+              </div>
+              {sale.payments.length === 0 ? (
+                <div className="text-[12.5px]" style={{ color: "var(--mu)" }}>
+                  Belum ada pembayaran
+                </div>
+              ) : (
+                sale.payments.map((p, i) => (
+                  <div
+                    key={i}
+                    className="flex justify-between gap-3 py-2 border-b text-[12.5px]"
+                    style={{ borderColor: "var(--ln)" }}
+                  >
+                    <span style={{ color: "var(--mu)" }}>
+                      {formatDate(p.date)} · {p.method}
+                      {p.status === "Diajukan" && " · menunggu approval"}
+                    </span>
+                    <b className="num" style={{ color: "var(--nv)" }}>
+                      {rp(p.amt)}
+                    </b>
+                  </div>
+                ))
+              )}
+            </div>
+          </>
+        )}
+
+        <div className="sim">
+          Disetujui: order dihapus, stok setiap barang dikembalikan, dan approval
+          ubah harga/pelunasan yang masih menunggu otomatis ditolak. Ditolak:
+          order tetap seperti semula.
+        </div>
+
+        <div className="text-[13px] px-1 mt-3">
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>Diajukan</span>
+            <b style={{ color: "var(--nv)" }}>{a.user}</b>
+          </div>
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>Waktu</span>
+            <b style={{ color: "var(--nv)" }}>{a.time}</b>
+          </div>
+          {a.decidedAt && (
+            <div className="flex justify-between py-1.5">
+              <span style={{ color: "var(--mu)" }}>Diputuskan</span>
+              <b style={{ color: "var(--nv)" }}>
+                {a.decidedAt}
+                {a.by ? ` oleh ${a.by}` : ""}
+              </b>
+            </div>
+          )}
+          {a.note && (
+            <div className="text-[11.5px] mt-1" style={{ color: "var(--er)" }}>
+              {a.note}
+            </div>
+          )}
+        </div>
+      </Drawer>
+    );
+  }
 
   /* ---------------- Invoice penjualan baru ---------------- */
   if (a.kind === "invoice") {
@@ -37,33 +382,67 @@ export function ApprovalDetailDrawer({
     const modal = req.items.reduce((x, i) => x + i.qty * i.cost, 0);
     const ops = (+req.ship || 0) + (+req.pack || 0) + (+req.other || 0);
     const profit = total - modal - ops;
+    const customer =
+      db.customers.find((c) => c.id === req.customerId) ??
+      db.customers.find((c) => c.name === req.customer);
+    const custStatus = customer ? customerStatus(customer) : null;
+    const overdue = overdueSales(db, {
+      id: req.customerId ?? customer?.id,
+      name: req.customer,
+    });
+    const overdueTotal = overdue.reduce(
+      (sum, s) => sum + Math.max(saleTotal(s) - salePaid(s), 0),
+      0,
+    );
+    const showOverdue =
+      a.status === "Menunggu" && overdue.length > 0 && !overdueWarnClosed;
 
     return (
-      <Drawer
-        open={Boolean(approvalId)}
-        onClose={onClose}
-        title="Detail invoice baru"
-        footer={
-          <button type="button" className="btn" onClick={onClose}>
-            Tutup
-          </button>
-        }
-      >
-        <div className="sdtop">
-          <div>
-            <div className="text-xs" style={{ color: "var(--mu)" }}>
-              {a.saleId ?? "Invoice baru"} · {formatDate(req.date)}
+      <>
+        <Drawer
+          open={Boolean(approvalId)}
+          onClose={onClose}
+          title="Detail invoice baru"
+          footer={<DecisionFooter approval={a} onClose={onClose} />}
+        >
+          <div className="sdtop">
+            <div>
+              <div className="text-xs" style={{ color: "var(--mu)" }}>
+                {a.saleId ?? "Invoice baru"} · {formatDate(req.date)}
+              </div>
+              <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                <div
+                  className="font-extrabold text-lg"
+                  style={{ color: "var(--nv)" }}
+                >
+                  {req.customer}
+                </div>
+                {custStatus === "Menunggu" && (
+                  <Badge tone="Menunggu">Menunggu approval</Badge>
+                )}
+              </div>
             </div>
-            <div className="font-extrabold text-lg" style={{ color: "var(--nv)" }}>
-              {req.customer}
-            </div>
+            <Badge tone={a.status}>{a.status}</Badge>
           </div>
-          <Badge tone={a.status}>{a.status}</Badge>
-        </div>
+
+          {overdue.length > 0 && (
+            <div className="sale-banner danger mb-3">
+              <b>
+                Toko punya {overdue.length} invoice menunggak
+              </b>{" "}
+              dengan total {rp(overdueTotal)}.
+              {req.overdue && req.overdue.count > 0 && (
+                <span className="block mt-1">
+                  Saat diajukan: {req.overdue.count} invoice ·{" "}
+                  {rp(req.overdue.total)}.
+                </span>
+              )}
+            </div>
+          )}
 
         <div className="sdc">
           <div className="sdh">
-            <span className="sdi">🛍️</span>
+            <span className="sdi"><Icon name="sales" /></span>
             <span>Barang &amp; laba per unit</span>
             <span className="ml-auto font-semibold" style={{ color: "var(--nv)" }}>
               {req.items.length} jenis
@@ -109,7 +488,7 @@ export function ApprovalDetailDrawer({
 
         <div className="sdc">
           <div className="sdh">
-            <span className="sdi">🚚</span>
+            <span className="sdi"><Icon name="purch" /></span>
             <span>Biaya operasional</span>
           </div>
           <div className="flex justify-between py-1.5 text-[13px]">
@@ -128,7 +507,7 @@ export function ApprovalDetailDrawer({
 
         <div className="sdc">
           <div className="sdh">
-            <span className="sdi">↗</span>
+            <span className="sdi"><Icon name="report" /></span>
             <span>Catatan laba</span>
           </div>
           <div className="text-[12.5px] space-y-1" style={{ color: "var(--mu)" }}>
@@ -199,6 +578,14 @@ export function ApprovalDetailDrawer({
           </div>
         </div>
       </Drawer>
+
+      <OverdueWarningDialog
+        open={showOverdue}
+        onClose={() => setOverdueWarnClosed(true)}
+        customerName={req.customer}
+        sales={overdue}
+      />
+      </>
     );
   }
 
@@ -217,11 +604,7 @@ export function ApprovalDetailDrawer({
         open={Boolean(approvalId)}
         onClose={onClose}
         title="Detail nota belanja"
-        footer={
-          <button type="button" className="btn" onClick={onClose}>
-            Tutup
-          </button>
-        }
+        footer={<DecisionFooter approval={a} onClose={onClose} />}
       >
         <div className="sdtop">
           <div>
@@ -237,7 +620,7 @@ export function ApprovalDetailDrawer({
 
         <div className="sdc">
           <div className="sdh">
-            <span className="sdi">🧾</span>
+            <span className="sdi"><Icon name="purch" /></span>
             <span>Barang yang dibelanjakan</span>
             <span className="ml-auto font-semibold" style={{ color: "var(--nv)" }}>
               {items.length} jenis
@@ -327,11 +710,7 @@ export function ApprovalDetailDrawer({
         open={Boolean(approvalId)}
         onClose={onClose}
         title="Detail pelunasan nota"
-        footer={
-          <button type="button" className="btn" onClick={onClose}>
-            Tutup
-          </button>
-        }
+        footer={<DecisionFooter approval={a} onClose={onClose} />}
       >
         <div className="sdtop">
           <div>
@@ -353,7 +732,7 @@ export function ApprovalDetailDrawer({
 
         <div className="sdc">
           <div className="sdh">
-            <span className="sdi">🧾</span>
+            <span className="sdi"><Icon name="purch" /></span>
             <span>Nota yang akan dilunasi</span>
             <span className="ml-auto font-semibold" style={{ color: "var(--nv)" }}>
               {items.length} jenis
@@ -429,11 +808,7 @@ export function ApprovalDetailDrawer({
         open={Boolean(approvalId)}
         onClose={onClose}
         title="Detail revisi nota belanja"
-        footer={
-          <button type="button" className="btn" onClick={onClose}>
-            Tutup
-          </button>
-        }
+        footer={<DecisionFooter approval={a} onClose={onClose} />}
       >
         <div className="sdtop">
           <div>
@@ -449,7 +824,7 @@ export function ApprovalDetailDrawer({
 
         <div className="sdc">
           <div className="sdh">
-            <span className="sdi">🧾</span>
+            <span className="sdi"><Icon name="purch" /></span>
             <span>Perubahan barang</span>
             <span className="ml-auto font-semibold" style={{ color: "var(--nv)" }}>
               {next.length} jenis
@@ -556,11 +931,7 @@ export function ApprovalDetailDrawer({
         open={Boolean(approvalId)}
         onClose={onClose}
         title="Detail perubahan invoice"
-        footer={
-          <button type="button" className="btn" onClick={onClose}>
-            Tutup
-          </button>
-        }
+        footer={<DecisionFooter approval={a} onClose={onClose} />}
       >
         <div className="sdtop">
           <div>
@@ -574,9 +945,11 @@ export function ApprovalDetailDrawer({
           <Badge tone={a.status}>{a.status}</Badge>
         </div>
 
+        {a.note && <div className="sale-banner danger mb-3">{a.note}</div>}
+
         <div className="sdc">
           <div className="sdh">
-            <span className="sdi">✎</span>
+            <span className="sdi"><Icon name="invoice" /></span>
             <span>Harga jual per unit</span>
           </div>
           {rev?.items.map((it, idx) => {
@@ -623,7 +996,7 @@ export function ApprovalDetailDrawer({
 
         <div className="sdc">
           <div className="sdh">
-            <span className="sdi">🚚</span>
+            <span className="sdi"><Icon name="purch" /></span>
             <span>Biaya operasional</span>
           </div>
           {[
@@ -649,7 +1022,7 @@ export function ApprovalDetailDrawer({
 
         <div className="sdc">
           <div className="sdh">
-            <span className="sdi">↗</span>
+            <span className="sdi"><Icon name="report" /></span>
             <span>Laba order</span>
           </div>
           <div className="flex justify-between py-1.5 text-[13px]">

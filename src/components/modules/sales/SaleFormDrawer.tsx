@@ -3,10 +3,17 @@
 import { useMemo, useState } from "react";
 import { addDays, TODAY } from "@/lib/date";
 import { rp } from "@/lib/format";
-import { salePriceHistory } from "@/lib/calc";
+import {
+  customerStatus,
+  overdueSales,
+  salePaid,
+  salePriceHistory,
+  saleTotal,
+} from "@/lib/calc";
 import { useStore, type SaleDraft } from "@/lib/store";
 import { Drawer } from "@/components/ui/Drawer";
 import { MoneyInput, NumberInput } from "@/components/ui/NumericInput";
+import { OverdueWarningDialog } from "@/components/ui/OverdueWarningDialog";
 import { Picker } from "@/components/ui/Picker";
 import type { CustomerType } from "@/lib/types";
 
@@ -37,6 +44,8 @@ export function SaleFormDrawer({
   const [newPhone, setNewPhone] = useState("");
   const [newAddress, setNewAddress] = useState("");
   const [newBank, setNewBank] = useState("");
+  const [overdueOpen, setOverdueOpen] = useState(false);
+  const [overdueAck, setOverdueAck] = useState(false);
 
   // State di-reset lewat remount (parent memberi key berbeda tiap dibuka).
   const [draft, setDraft] = useState<SaleDraft>(() => ({
@@ -63,6 +72,26 @@ export function SaleFormDrawer({
   const ops = draft.ship + draft.pack + draft.other;
   const profit = total - modal - ops;
 
+  const selectedCustomer =
+    db.customers.find((c) => c.id === draft.customerId) ??
+    db.customers.find((c) => c.name === draft.customer) ??
+    null;
+  const selectedStatus = selectedCustomer
+    ? customerStatus(selectedCustomer)
+    : null;
+  const currentOverdue = selectedCustomer
+    ? overdueSales(db, selectedCustomer)
+    : draft.customer
+      ? overdueSales(db, {
+          id: draft.customerId,
+          name: draft.customer,
+        })
+      : [];
+  const overdueTotal = currentOverdue.reduce(
+    (a, s) => a + Math.max(saleTotal(s) - salePaid(s), 0),
+    0,
+  );
+
   /** Peringatan stok minus: penjualan tetap dicatat, stok menjadi minus. */
   const stockWarnings = priced
     .filter((i) => i.stock - i.qty < 0)
@@ -85,7 +114,7 @@ export function SaleFormDrawer({
       return;
     }
     toast(res.msg);
-    (res.warnings ?? []).forEach((w) => toast(`⚠ ${w}`));
+    (res.warnings ?? []).forEach((w) => toast(w));
     onClose();
   };
 
@@ -116,10 +145,15 @@ export function SaleFormDrawer({
               onClick={() => setPickerOpen(true)}
             >
               <span
-                className={draft.customer ? "" : "text-left"}
+                className="flex items-center gap-2 min-w-0 text-left"
                 style={draft.customer ? undefined : { color: "var(--mu)" }}
               >
-                {draft.customer || "Pilih pelanggan..."}
+                <span className="truncate">
+                  {draft.customer || "Pilih pelanggan..."}
+                </span>
+                {selectedStatus === "Menunggu" && (
+                  <span className="bd b-wa flex-none">Menunggu approval</span>
+                )}
               </span>
               <span aria-hidden="true">▾</span>
             </button>
@@ -157,6 +191,23 @@ export function SaleFormDrawer({
             <div />
           )}
         </div>
+
+        {overdueAck && currentOverdue.length > 0 && (
+          <div
+            className="mt-3 rounded-xl px-3 py-2 text-[12px]"
+            style={{
+              background: "var(--warn-bg)",
+              border: "1px solid #f6e4a6",
+              color: "var(--wa)",
+            }}
+          >
+            <b>
+              Toko punya {currentOverdue.length} invoice menunggak
+            </b>{" "}
+            dengan total {rp(overdueTotal)}. Invoice baru tetap bisa diajukan;
+            tunggakan dicatat di ringkasan approval.
+          </div>
+        )}
 
         <div className="dsec">Detail produk</div>
         <div className="space-y-2">
@@ -332,15 +383,32 @@ export function SaleFormDrawer({
         onClose={() => setPickerOpen(false)}
         title="Pelanggan"
         value={draft.customerId}
-        options={db.customers.map((c) => ({
-          id: c.id,
-          name: c.name,
-          sub: c.phone,
-          badge: c.type,
-        }))}
-        onSelect={(o) =>
-          setDraft((d) => ({ ...d, customer: o.name, customerId: o.id }))
-        }
+        options={db.customers
+          .filter((c) => customerStatus(c) !== "Diarsipkan")
+          .map((c) => ({
+            id: c.id,
+            name: c.name,
+            sub: c.phone,
+            badges: (
+              <>
+                <span className="bd b-in">{c.type}</span>
+                {customerStatus(c) === "Menunggu" && (
+                  <span className="bd b-wa">Menunggu approval</span>
+                )}
+              </>
+            ),
+          }))}
+        onSelect={(o) => {
+          const customer = db.customers.find((c) => c.id === o.id);
+          const overdue = customer ? overdueSales(db, customer) : [];
+          setDraft((d) => ({
+            ...d,
+            customer: o.name,
+            customerId: o.id,
+          }));
+          setOverdueAck(overdue.length === 0);
+          setOverdueOpen(overdue.length > 0);
+        }}
         onCreate={(name) => {
           const res = addCustomer({
             name,
@@ -350,6 +418,7 @@ export function SaleFormDrawer({
             bank: newBank,
           });
           if (res.ok && res.customer) {
+            toast(res.msg);
             setDraft((d) => ({
               ...d,
               customer: res.customer!.name,
@@ -358,12 +427,13 @@ export function SaleFormDrawer({
             setNewPhone("");
             setNewAddress("");
             setNewBank("");
+            setOverdueAck(false);
+            setOverdueOpen(false);
           }
           return res;
         }}
         createLabel="Tambah pelanggan baru"
-        createExtra={
-          <div className="grid sm:grid-cols-2 gap-2 mb-2">
+        createExtra={          <div className="grid sm:grid-cols-2 gap-2 mb-2">
             <div>
               <label className="f">Jenis</label>
               <select
@@ -404,6 +474,26 @@ export function SaleFormDrawer({
             </div>
           </div>
         }
+      />
+
+      <OverdueWarningDialog
+        open={overdueOpen}
+        onClose={() => {
+          setOverdueOpen(false);
+          setOverdueAck(true);
+        }}
+        customerName={draft.customer}
+        sales={currentOverdue}
+        onChangeCustomer={() => {
+          setOverdueOpen(false);
+          setOverdueAck(false);
+          setDraft((d) => ({
+            ...d,
+            customer: "",
+            customerId: undefined,
+          }));
+          setPickerOpen(true);
+        }}
       />
     </>
   );

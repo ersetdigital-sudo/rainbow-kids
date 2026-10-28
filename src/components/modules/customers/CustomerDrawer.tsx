@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { customerStatus } from "@/lib/calc";
 import { useStore } from "@/lib/store";
 import { Drawer } from "@/components/ui/Drawer";
+import { ReasonDialog } from "@/components/ui/ReasonDialog";
 import type { CustomerType } from "@/lib/types";
 
 /**
@@ -17,7 +19,8 @@ export function CustomerDrawer({
   customerId: string | null;
   onClose: () => void;
 }) {
-  const { db, addCustomer, updateCustomer, toast } = useStore();
+  const { db, addCustomer, updateCustomer, requestCustomerDelete, toast } =
+    useStore();
   const isNew = customerId === "new";
   const existing =
     customerId && !isNew
@@ -29,6 +32,17 @@ export function CustomerDrawer({
   const [phone, setPhone] = useState(existing?.phone ?? "");
   const [address, setAddress] = useState(existing?.address ?? "");
   const [bank, setBank] = useState(existing?.bank ?? "");
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
+  const pendingDelete = Boolean(
+    existing &&
+      db.approvals.some(
+        (a) =>
+          a.kind === "customerDelete" &&
+          a.customerId === existing.id &&
+          a.status === "Menunggu",
+      ),
+  );
 
   const submit = () => {
     const res = isNew
@@ -39,12 +53,23 @@ export function CustomerDrawer({
   };
 
   return (
-    <Drawer
-      open={Boolean(customerId)}
+    <>
+      <Drawer
+        open={Boolean(customerId)}
       onClose={onClose}
       title={isNew ? "Tambah pelanggan" : "Ubah data pelanggan"}
       footer={
         <>
+          {existing && (
+            <button
+              type="button"
+              className="btn d mr-auto"
+              disabled={pendingDelete}
+              onClick={() => setDeleteOpen(true)}
+            >
+              {pendingDelete ? "Menunggu hapus" : "Ajukan hapus"}
+            </button>
+          )}
           <button type="button" className="btn" onClick={onClose}>
             Batal
           </button>
@@ -54,6 +79,15 @@ export function CustomerDrawer({
         </>
       }
     >
+      {existing && (
+        <div className="sim mb-3">
+          Status: <b>{customerStatus(existing)}</b>
+          {customerStatus(existing) === "Menunggu" &&
+            " — menunggu approval Owner."}
+          {customerStatus(existing) === "Diarsipkan" &&
+            " — tidak bisa dipilih di transaksi baru."}
+        </div>
+      )}
       <div className="grid sm:grid-cols-2 gap-3">
         <div>
           <label className="f">Nama pelanggan</label>
@@ -109,5 +143,23 @@ export function CustomerDrawer({
         untuk memakai rekening utama toko.
       </div>
     </Drawer>
+
+    {existing && (
+      <ReasonDialog
+        key={`delete-customer-drawer-${existing.id}`}
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        title="Ajukan hapus toko"
+        description={`Pengajuan hapus untuk ${existing.name} akan diperiksa Owner. Toko tanpa transaksi akan dihapus permanen; toko yang punya transaksi akan diarsipkan.`}
+        placeholder="Contoh: toko sudah tidak aktif / pindah domisili"
+        onConfirm={(reason) => {
+          const res = requestCustomerDelete(existing.id, reason);
+          toast(res.msg);
+          if (res.ok) setDeleteOpen(false);
+          return res;
+        }}
+      />
+    )}
+    </>
   );
 }

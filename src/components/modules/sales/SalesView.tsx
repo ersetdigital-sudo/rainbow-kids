@@ -6,6 +6,7 @@ import { rp } from "@/lib/format";
 import { downloadCsv, stamp } from "@/lib/export";
 import {
   arStatus,
+  overdueSales,
   saleCost,
   saleOps,
   salePaid,
@@ -57,6 +58,17 @@ export function SalesView() {
     db.customers.find((c) => c.id === s.customerId) ??
     db.customers.find((c) => c.name === s.customer);
 
+  const hasPendingDelete = (s: Sale) =>
+    db.approvals.some(
+      (a) =>
+        a.kind === "saleDelete" &&
+        a.saleId === s.id &&
+        a.status === "Menunggu",
+    );
+
+  const hasOverdue = (s: Sale) =>
+    overdueSales(db, { id: s.customerId, name: s.customer }).length > 0;
+
   const exportRows = () => {
     downloadCsv(
       `penjualan-rainbow-kids-${stamp()}`,
@@ -102,14 +114,30 @@ export function SalesView() {
     {
       key: "id",
       label: "No. Invoice",
-      render: (s) => <span className="font-semibold">{s.id}</span>,
+      render: (s) => (
+        <div>
+          <span className="font-semibold">{s.id}</span>
+          {hasPendingDelete(s) && (
+            <div>
+              <span className="bd b-er mt-1">Pengajuan hapus</span>
+            </div>
+          )}
+        </div>
+      ),
     },
     { key: "date", label: "Tanggal", render: (s) => formatDate(s.date) },
     {
       key: "customer",
       label: "Pelanggan",
       cellClass: "h-wrap",
-      render: (s) => s.customer,
+      render: (s) => (
+        <div>
+          <div>{s.customer}</div>
+          {hasOverdue(s) && (
+            <span className="bd b-er mt-1">Ada tunggakan</span>
+          )}
+        </div>
+      ),
     },
     {
       key: "total",

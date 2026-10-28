@@ -31,6 +31,9 @@ const KIND_META: Record<
   payment: { label: "Pelunasan", icon: "ar" },
   purchase: { label: "Status Bayar Pembelian", icon: "purch" },
   sale: { label: "Ubah Harga & Biaya", icon: "invoice" },
+  customer: { label: "Pelanggan", icon: "cust" },
+  customerDelete: { label: "Hapus Pelanggan", icon: "cust" },
+  saleDelete: { label: "Hapus Penjualan", icon: "sales" },
 };
 
 /** Jenis approval yang punya drawer detail (sama dengan tombol Detail di /approvals). */
@@ -40,6 +43,9 @@ const DETAIL_KINDS = new Set<Approval["kind"]>([
   "notaEdit",
   "purchase",
   "sale",
+  "customer",
+  "customerDelete",
+  "saleDelete",
 ]);
 
 type ActivityItem = {
@@ -131,6 +137,35 @@ function approvalActivity(db: DB, a: Approval): ActivityItem {
         ...base,
         summary: `${a.kind === "notaEdit" ? "Revisi nota" : "Nota"} ${nota} · ${supplier}`,
         detail: `${rp(Number(a.after))}`,
+      };
+    }
+    case "customer": {
+      const customer = db.customers.find((c) => c.id === a.customerId);
+      return {
+        ...base,
+        summary: `${a.customerName ?? customer?.name ?? "-"} · ${customer?.type ?? "Pelanggan"}`,
+        detail:
+          a.status === "Menunggu"
+            ? "Pelanggan baru menunggu approval"
+            : a.status === "Disetujui"
+              ? "Pelanggan disetujui — status Aktif"
+              : "Pelanggan ditolak — diarsipkan",
+      };
+    }
+    case "customerDelete": {
+      const customer = db.customers.find((c) => c.id === a.customerId);
+      return {
+        ...base,
+        summary: `${a.customerName ?? customer?.name ?? "-"}`,
+        detail: a.reason ? `Alasan: ${a.reason}` : "Pengajuan hapus pelanggan",
+      };
+    }
+    case "saleDelete": {
+      const snapshot = a.saleSnapshot;
+      return {
+        ...base,
+        summary: `${snapshot?.id ?? a.saleId ?? "Invoice"} · ${snapshot?.customer ?? "-"}`,
+        detail: a.reason ? `Alasan: ${a.reason}` : "Snapshot order tersimpan",
       };
     }
     default: {
@@ -464,6 +499,7 @@ export function ActivityBell() {
             </AnimatePresence>
 
             <ApprovalDetailDrawer
+              key={`activity-approval-${approvalId ?? "none"}`}
               approvalId={approvalId}
               onClose={() => setApprovalId(null)}
             />

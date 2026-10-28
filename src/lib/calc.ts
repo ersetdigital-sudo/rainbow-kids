@@ -1,6 +1,7 @@
 import { TODAY, addDays } from "./date";
 import type {
   ArStatus,
+  CustomerStatus,
   DB,
   Payment,
   PaymentPosition,
@@ -46,6 +47,41 @@ export function arStatus(s: Sale, today = TODAY): ArStatus {
   if (s.due < today) return "Terlambat";
   if (s.due <= addDays(today, 3)) return "Jatuh tempo";
   return "Belum jatuh tempo";
+}
+
+/** Status pelanggan; data lama tanpa status dianggap aktif. */
+export const customerStatus = (customer: {
+  status?: CustomerStatus;
+}): CustomerStatus => customer.status ?? "Aktif";
+
+/** Cocokkan sale ke pelanggan lewat ID, atau nama untuk data lama. */
+export function saleBelongsToCustomer(
+  sale: Sale,
+  customer: { id?: string; name: string },
+): boolean {
+  if (customer.id && sale.customerId)
+    return sale.customerId === customer.id;
+  return (
+    sale.customer.trim().toLowerCase() ===
+    customer.name.trim().toLowerCase()
+  );
+}
+
+/**
+ * Invoice milik pelanggan yang masih punya sisa tagihan dan sudah lewat
+ * jatuh tempo (due < TODAY). Invoice dengan pengajuan pelunasan tetap masuk.
+ */
+export function overdueSales(
+  db: DB,
+  customer: { id?: string; name: string },
+): Sale[] {
+  return db.sales
+    .filter((s) => saleBelongsToCustomer(s, customer))
+    .filter(
+      (s) =>
+        saleTotal(s) - salePaid(s) > 0 && Boolean(s.due) && (s.due as string) < TODAY,
+    )
+    .sort((a, b) => ((a.due as string) < (b.due as string) ? -1 : 1));
 }
 
 /**
