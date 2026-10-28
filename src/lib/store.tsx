@@ -8,7 +8,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { TODAY } from "./date";
+import { TODAY, nowStamp } from "./date";
 import { uid } from "./format";
 import {
   purchaseTotal,
@@ -26,6 +26,7 @@ import {
 } from "./persist";
 import type {
   ApprovalField,
+  AppUser,
   Biz,
   CostChange,
   Customer,
@@ -80,6 +81,21 @@ export type Result = {
 };
 
 const PERM_LEVELS = ["Tidak", "Lihat", "Input", "Ajukan", "Penuh", "Setujui"];
+
+/**
+ * Apakah `db.user` (mis. "Budi (Owner)") merujuk ke pengguna ini.
+ * Data lama menyimpan nama depan saja, jadi nama depan juga dicocokkan.
+ */
+function isActiveUser(current: string, user: AppUser): boolean {
+  const value = current.trim().toLowerCase();
+  const name = user.name.trim().toLowerCase();
+  if (!value) return false;
+  if (value === name || value === user.email.trim().toLowerCase()) return true;
+  const suffix = `(${user.role.toLowerCase()})`;
+  if (!value.endsWith(suffix)) return false;
+  const label = value.slice(0, -suffix.length).trim();
+  return label === name || label === name.split(/\s+/)[0];
+}
 
 const StoreContext = createContext<StoreValue | null>(null);
 
@@ -250,7 +266,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         );
     }
 
-    const time = `${TODAY} ${new Date().toTimeString().slice(0, 5)}`;
+    const time = nowStamp();
     setSnapshot((prev) => ({
       ...prev,
       approvals: [
@@ -312,7 +328,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         +sale.other === +revision.other;
       if (sameItems && sameOps) return { ok: false, msg: "Tidak ada perubahan" };
 
-      const time = `${TODAY} ${new Date().toTimeString().slice(0, 5)}`;
+      const time = nowStamp();
       const after = saleProfit({ ...sale, ...revision });
       setSnapshot((prev) => ({
         ...prev,
@@ -353,7 +369,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (p.amt <= 0) return { ok: false, msg: "Jumlah tidak valid" };
       if (rem <= 0) return { ok: false, msg: "Invoice ini sudah lunas" };
 
-      const time = `${TODAY} ${new Date().toTimeString().slice(0, 5)}`;
+      const time = nowStamp();
 
       if (p.amt >= rem) {
         if (saleProposed(sale) >= rem)
@@ -501,7 +517,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         });
       if (!list.length) return { ok: false, msg: "Tidak ada perubahan" };
 
-      const time = `${TODAY} ${new Date().toTimeString().slice(0, 5)}`;
+      const time = nowStamp();
       setSnapshot((prev) => ({
         ...prev,
         approvals: [
@@ -541,7 +557,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         return { ok: false, msg: "Isi supplier dan no. nota" };
       if (!draft.items.length)
         return { ok: false, msg: "Tambahkan minimal satu barang" };
-      const time = `${TODAY} ${new Date().toTimeString().slice(0, 5)}`;
+      const time = nowStamp();
 
       // Satu nota belanja = satu pengajuan approval (bukan per barang).
       const costChanges: CostChange[] = [];
@@ -601,7 +617,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         return { ok: false, msg: "Pembelian ini sudah lunas" };
       if (p.payStatus === "Menunggu Lunas")
         return { ok: false, msg: "Sudah ada pengajuan yang menunggu approval" };
-      const time = `${TODAY} ${new Date().toTimeString().slice(0, 5)}`;
+      const time = nowStamp();
       setSnapshot((prev) => ({
         ...prev,
         purchases: prev.purchases.map((x) =>
@@ -671,7 +687,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         });
       if (sameHead && sameItems) return { ok: false, msg: "Tidak ada perubahan" };
 
-      const time = `${TODAY} ${new Date().toTimeString().slice(0, 5)}`;
+      const time = nowStamp();
       const request: PurchaseRequest = {
         supplier: draft.supplier.trim(),
         nota: draft.nota.trim(),
@@ -745,11 +761,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       );
       if (missing)
         return { ok: false, msg: "Isi penyebab untuk setiap selisih" };
+      const submittedAt = nowStamp();
       setSnapshot((prev) => ({
         ...prev,
         opnames: prev.opnames.map((x) =>
           x.id === id
-            ? { ...x, status: "Menunggu" as const, sub: prev.user }
+            ? { ...x, status: "Menunggu" as const, sub: prev.user, submittedAt }
             : x,
         ),
       }));
@@ -759,6 +776,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   );
 
   const decideOpname = useCallback<StoreValue["decideOpname"]>((id, ok) => {
+    const decidedAt = nowStamp();
     setSnapshot((prev) => {
       const o = prev.opnames.find((x) => x.id === id);
       if (!o) return prev;
@@ -786,7 +804,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         history,
         opnames: prev.opnames.map((x) =>
           x.id === id
-            ? { ...x, status: ok ? "Disetujui" : "Ditolak", by: prev.user }
+            ? { ...x, status: ok ? "Disetujui" : "Ditolak", by: prev.user, decidedAt }
             : x,
         ),
       };
@@ -796,6 +814,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   /* ---------------- Approval ---------------- */
 
   const decideApproval = useCallback<StoreValue["decideApproval"]>((id, ok) => {
+    const decidedAt = nowStamp();
     setSnapshot((prev) => {
       const a = prev.approvals.find((x) => x.id === id);
       if (!a) return prev;
@@ -808,7 +827,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             ...prev,
             approvals: prev.approvals.map((x) =>
               x.id === id
-                ? { ...x, status: ok ? "Disetujui" : "Ditolak", by: prev.user }
+                ? { ...x, status: ok ? "Disetujui" : "Ditolak", by: prev.user, decidedAt }
                 : x,
             ),
           };
@@ -869,6 +888,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
                   ...x,
                   status: "Disetujui" as const,
                   by: prev.user,
+                  decidedAt,
                   saleId,
                 }
               : x,
@@ -894,7 +914,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           ),
           approvals: prev.approvals.map((x) =>
             x.id === id
-              ? { ...x, status: ok ? "Disetujui" : "Ditolak", by: prev.user }
+              ? { ...x, status: ok ? "Disetujui" : "Ditolak", by: prev.user, decidedAt }
               : x,
           ),
         };
@@ -911,7 +931,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           ),
           approvals: prev.approvals.map((x) =>
             x.id === id
-              ? { ...x, status: ok ? "Disetujui" : "Ditolak", by: prev.user }
+              ? { ...x, status: ok ? "Disetujui" : "Ditolak", by: prev.user, decidedAt }
               : x,
           ),
         };
@@ -941,7 +961,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           history,
           approvals: prev.approvals.map((x) =>
             x.id === id
-              ? { ...x, status: ok ? "Disetujui" : "Ditolak", by: prev.user }
+              ? { ...x, status: ok ? "Disetujui" : "Ditolak", by: prev.user, decidedAt }
               : x,
           ),
         };
@@ -959,7 +979,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
               ...prev,
               approvals: prev.approvals.map((x) =>
                 x.id === id
-                  ? { ...x, status: "Ditolak" as const, by: prev.user }
+                  ? { ...x, status: "Ditolak" as const, by: prev.user, decidedAt }
                   : x,
               ),
             };
@@ -1017,6 +1037,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
                     ...x,
                     status: "Disetujui" as const,
                     by: prev.user,
+                    decidedAt,
                     purchaseId,
                   }
                 : x,
@@ -1048,7 +1069,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           history,
           approvals: prev.approvals.map((x) =>
             x.id === id
-              ? { ...x, status: ok ? "Disetujui" : "Ditolak", by: prev.user }
+              ? { ...x, status: ok ? "Disetujui" : "Ditolak", by: prev.user, decidedAt }
               : x,
           ),
         };
@@ -1064,7 +1085,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             ...prev,
             approvals: prev.approvals.map((x) =>
               x.id === id
-                ? { ...x, status: ok ? "Disetujui" : "Ditolak", by: prev.user }
+                ? { ...x, status: ok ? "Disetujui" : "Ditolak", by: prev.user, decidedAt }
                 : x,
             ),
           };
@@ -1121,7 +1142,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           ),
           approvals: prev.approvals.map((x) =>
             x.id === id
-              ? { ...x, status: "Disetujui" as const, by: prev.user }
+              ? { ...x, status: "Disetujui" as const, by: prev.user, decidedAt }
               : x,
           ),
         };
@@ -1182,7 +1203,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         history,
         approvals: prev.approvals.map((x) =>
           x.id === id
-            ? { ...x, status: ok ? "Disetujui" : "Ditolak", by: prev.user }
+            ? { ...x, status: ok ? "Disetujui" : "Ditolak", by: prev.user, decidedAt }
             : x,
         ),
       };
@@ -1214,6 +1235,41 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       users: [...prev.users, { ...u, name: u.name.trim(), active: true }],
     }));
     return { ok: true, msg: "Undangan disimulasikan" };
+  }, []);
+
+  /** Ubah nama, email, dan role pengguna. Role Owner tidak bisa diturunkan. */
+  const updateUser = useCallback<StoreValue["updateUser"]>((index, patch) => {
+    const name = patch.name.trim();
+    const email = patch.email.trim();
+    if (!name) return { ok: false, msg: "Isi nama pengguna" };
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+      return { ok: false, msg: "Format email tidak valid" };
+
+    const current = getSnapshot();
+    const user = current.users[index];
+    if (!user) return { ok: false, msg: "Pengguna tidak ditemukan" };
+    if (
+      current.users.some(
+        (u, i) => i !== index && u.email.toLowerCase() === email.toLowerCase(),
+      )
+    )
+      return { ok: false, msg: "Email itu sudah dipakai pengguna lain" };
+    if (user.role === "Owner" && patch.role !== "Owner")
+      return { ok: false, msg: "Role Owner tidak bisa diubah" };
+
+    const role = user.role === "Owner" ? "Owner" : patch.role;
+    const wasActive = isActiveUser(current.user, user);
+
+    setSnapshot((prev) => ({
+      ...prev,
+      users: prev.users.map((u, i) =>
+        i === index ? { ...u, name, email, role } : u,
+      ),
+      // Hanya penanda pengguna aktif yang mengikuti nama baru;
+      // riwayat approval/opname lama tetap memakai nama saat kejadian.
+      user: wasActive ? `${name} (${role})` : prev.user,
+    }));
+    return { ok: true, msg: "Data pengguna diperbarui" };
   }, []);
 
   const cyclePerm = useCallback<StoreValue["cyclePerm"]>((role, module) => {
@@ -1256,6 +1312,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setUserRole,
       toggleUser,
       inviteUser,
+      updateUser,
       cyclePerm,
     }),
     [
@@ -1282,6 +1339,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setUserRole,
       toggleUser,
       inviteUser,
+      updateUser,
       cyclePerm,
     ],
   );
@@ -1361,6 +1419,10 @@ type StoreValue = {
   setUserRole: (index: number, role: Role) => void;
   toggleUser: (index: number) => void;
   inviteUser: (u: { name: string; email: string; role: Role }) => Result;
+  updateUser: (
+    index: number,
+    patch: { name: string; email: string; role: Role },
+  ) => Result;
   cyclePerm: (role: Role, module: ModuleKey) => void;
 };
 

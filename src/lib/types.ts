@@ -189,6 +189,8 @@ export type Approval = {
   time: string;
   status: "Menunggu" | "Disetujui" | "Ditolak";
   by?: string;
+  /** Waktu keputusan Owner/Approver ("YYYY-MM-DD HH:mm"). */
+  decidedAt?: string;
   ref?: string;
 };
 
@@ -208,6 +210,10 @@ export type Opname = {
   lines: OpnameLine[];
   sub?: string;
   by?: string;
+  /** Waktu pengajuan ke Owner ("YYYY-MM-DD HH:mm"). */
+  submittedAt?: string;
+  /** Waktu keputusan Owner/Approver ("YYYY-MM-DD HH:mm"). */
+  decidedAt?: string;
 };
 
 export type Expense = {

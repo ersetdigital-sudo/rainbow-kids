@@ -6,6 +6,7 @@ import { rp } from "@/lib/format";
 import { salePaid, saleProposed, saleTotal } from "@/lib/calc";
 import { useStore } from "@/lib/store";
 import { Drawer } from "@/components/ui/Drawer";
+import { MoneyInput } from "@/components/ui/NumericInput";
 
 export function PayDrawer({
   saleId,
@@ -69,11 +70,7 @@ export function PayDrawer({
         </div>
         <div>
           <label className="f">Jumlah</label>
-          <input
-            type="number"
-            value={amt}
-            onChange={(e) => setAmt(+e.target.value)}
-          />
+          <MoneyInput value={amt} onChange={setAmt} />
         </div>
         <div>
           <label className="f">Metode</label>

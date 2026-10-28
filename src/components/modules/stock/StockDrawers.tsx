@@ -6,6 +6,7 @@ import { rp } from "@/lib/format";
 import { useStore, type VariantInput } from "@/lib/store";
 import { Badge } from "@/components/ui/Badge";
 import { Drawer } from "@/components/ui/Drawer";
+import { MoneyInput, NumberInput } from "@/components/ui/NumericInput";
 import type { HistoryEntry, Variant } from "@/lib/types";
 
 /* ---------- Riwayat varian ---------- */
@@ -135,27 +136,15 @@ export function ChangeRequestDrawer({
         </div>
         <div>
           <label className="f">Harga modal (internal)</label>
-          <input
-            type="number"
-            value={cost}
-            onChange={(e) => setCost(+e.target.value)}
-          />
+          <MoneyInput value={cost} onChange={setCost} />
         </div>
         <div>
           <label className="f">Harga jual minimum</label>
-          <input
-            type="number"
-            value={minPrice}
-            onChange={(e) => setMinPrice(+e.target.value)}
-          />
+          <MoneyInput value={minPrice} onChange={setMinPrice} />
         </div>
         <div>
           <label className="f">Harga jual maksimum</label>
-          <input
-            type="number"
-            value={maxPrice}
-            onChange={(e) => setMaxPrice(+e.target.value)}
-          />
+          <MoneyInput value={maxPrice} onChange={setMaxPrice} />
         </div>
       </div>
       <div className="sim mt-4">
@@ -240,48 +229,37 @@ export function ProductFormDrawer({
         </div>
         <div>
           <label className="f">Harga jual minimum</label>
-          <input
-            type="number"
-            value={minPrice || ""}
-            onChange={(e) => setMinPrice(+e.target.value)}
-          />
+          <MoneyInput value={minPrice} onChange={setMinPrice} />
         </div>
         <div>
           <label className="f">Harga jual maksimum</label>
-          <input
-            type="number"
-            value={maxPrice || ""}
-            onChange={(e) => setMaxPrice(+e.target.value)}
-          />
+          <MoneyInput value={maxPrice} onChange={setMaxPrice} />
         </div>
       </div>
 
       <div className="dsec">Varian</div>
       <div className="space-y-2">
         {rows.map((r, i) => (
-          <div key={i} className="grid grid-cols-4 gap-2">
+          <div key={i} className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <input
               placeholder="Nama varian"
               value={r.name}
               onChange={(e) => update(i, { name: e.target.value })}
             />
-            <input
-              type="number"
+            <NumberInput
               placeholder="Stok awal"
-              value={r.stock || ""}
-              onChange={(e) => update(i, { stock: +e.target.value })}
+              value={r.stock}
+              onChange={(stock) => update(i, { stock })}
             />
-            <input
-              type="number"
+            <MoneyInput
               placeholder="Harga modal"
-              value={r.cost || ""}
-              onChange={(e) => update(i, { cost: +e.target.value })}
+              value={r.cost}
+              onChange={(cost) => update(i, { cost })}
             />
-            <input
-              type="number"
+            <MoneyInput
               placeholder="Harga standar"
-              value={r.price || ""}
-              onChange={(e) => update(i, { price: +e.target.value })}
+              value={r.price}
+              onChange={(price) => update(i, { price })}
             />
           </div>
         ))}

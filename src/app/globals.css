@@ -369,6 +369,255 @@
   background: #ef4444;
   box-shadow: 0 0 0 2px #fff;
 }
+
+/* ---------------- Panel riwayat kegiatan (lonceng) ---------------- */
+.act-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  pointer-events: none;
+}
+.act-back {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  border: 0;
+  pointer-events: auto;
+  cursor: default;
+}
+.act-pop {
+  position: fixed;
+  top: var(--act-top);
+  right: var(--act-right);
+  width: min(420px, calc(100vw - 24px));
+  max-height: min(72vh, 680px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  pointer-events: auto;
+  background: #fff;
+  border: 1px solid var(--ln);
+  border-radius: 18px;
+  box-shadow:
+    0 30px 70px -30px rgba(4, 18, 63, 0.55),
+    0 8px 22px -16px rgba(4, 18, 63, 0.25);
+}
+.act-grip {
+  display: none;
+}
+.act-head {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--ln);
+}
+.act-title {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--nv);
+}
+.act-sub {
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--mu);
+}
+.act-tabs {
+  flex: none;
+  display: flex;
+  gap: 4px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--ln);
+  overflow-x: auto;
+}
+.act-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--mu);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.act-tab:hover {
+  background: #f5f7fb;
+  color: var(--nv);
+}
+.act-tab.on {
+  background: var(--nv);
+  color: #fff;
+}
+.act-n {
+  font-size: 10.5px;
+  font-weight: 700;
+  opacity: 0.6;
+}
+.act-tab.on .act-n {
+  opacity: 0.8;
+}
+.act-list {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+}
+.act-item {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.14s,
+    border-color 0.14s;
+}
+.act-item:hover {
+  background: #f7f9fc;
+  border-color: #eef1f6;
+}
+.act-ic {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--acs);
+  color: var(--ac2);
+}
+.act-ic svg {
+  width: 17px;
+  height: 17px;
+  flex: none;
+}
+.act-main {
+  flex: 1;
+  min-width: 0;
+  display: block;
+}
+.act-toprow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.act-kind {
+  flex: 1;
+  min-width: 0;
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--mu);
+}
+.act-toprow .bd {
+  flex: none;
+  font-size: 10px;
+  padding: 2px 8px;
+}
+.act-sum {
+  display: block;
+  margin-top: 3px;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--nv);
+  overflow-wrap: anywhere;
+}
+.act-detail {
+  display: block;
+  margin-top: 1px;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--tx);
+  overflow-wrap: anywhere;
+}
+.act-meta {
+  display: block;
+  margin-top: 2px;
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: var(--mu);
+  overflow-wrap: anywhere;
+}
+.act-empty {
+  padding: 34px 14px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--mu);
+}
+.act-foot {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  padding: 10px 14px;
+  border-top: 1px solid var(--ln);
+  background: #fbfcfe;
+}
+.act-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--nv);
+}
+.act-more:hover {
+  text-decoration: underline;
+}
+@media (max-width: 767px) {
+  .act-back {
+    background: rgba(9, 15, 38, 0.48);
+    backdrop-filter: blur(4px);
+  }
+  .act-pop {
+    top: auto;
+    right: 0;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    max-height: 88dvh;
+    border-radius: 24px 24px 0 0;
+    border-bottom: 0;
+  }
+  .act-grip {
+    display: block;
+    flex: none;
+    width: 42px;
+    height: 4px;
+    margin: 10px auto 2px;
+    border-radius: 9px;
+    background: #dfe3ec;
+  }
+  .act-head {
+    padding: 12px 16px;
+  }
+  .act-title {
+    font-size: 17px;
+  }
+  .act-list {
+    padding: 6px 8px;
+  }
+  .act-sum {
+    font-size: 13px;
+  }
+  .act-foot {
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  }
+}
 .tb-user {
   display: flex;
   align-items: center;
@@ -681,6 +930,25 @@ label.f {
   font-weight: 600;
   color: var(--mu);
   margin-bottom: 4px;
+}
+
+/* Input nominal rupiah — prefix di dalam field, menyatu dengan style input. */
+.money-input {
+  position: relative;
+  width: 100%;
+}
+.money-prefix {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--mu);
+  pointer-events: none;
+}
+.money-input input {
+  padding-left: 36px;
 }
 
 /* ---------------- Tables ---------------- */

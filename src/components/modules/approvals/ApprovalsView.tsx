@@ -13,10 +13,10 @@ import type { Approval, PaymentPosition } from "@/lib/types";
 const FILTERS = ["Menunggu", "Disetujui", "Ditolak", "Semua"] as const;
 type Filter = (typeof FILTERS)[number];
 
-export function ApprovalsView() {
+export function ApprovalsView({ focusId = null }: { focusId?: string | null }) {
   const { db, decideApproval, toast } = useStore();
-  const [filter, setFilter] = useState<Filter>("Menunggu");
-  const [detailId, setDetailId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<Filter>(focusId ? "Semua" : "Menunggu");
+  const [detailId, setDetailId] = useState<string | null>(focusId);
 
   const list = useMemo(
     () =>

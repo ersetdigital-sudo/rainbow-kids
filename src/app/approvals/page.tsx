@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { ApprovalsView } from "@/components/modules/approvals/ApprovalsView";
 
 export const metadata: Metadata = {
@@ -8,6 +9,24 @@ export const metadata: Metadata = {
   alternates: { canonical: "/approvals" },
 };
 
-export default function ApprovalsPage() {
-  return <ApprovalsView />;
+async function ApprovalsContent({
+  searchParams,
+}: {
+  searchParams: Promise<{ focus?: string | string[] }>;
+}) {
+  const { focus } = await searchParams;
+  const focusId = Array.isArray(focus) ? focus[0] : focus;
+  return <ApprovalsView key={focusId ?? "all"} focusId={focusId ?? null} />;
+}
+
+export default function ApprovalsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ focus?: string | string[] }>;
+}) {
+  return (
+    <Suspense fallback={<div className="min-h-40" aria-hidden="true" />}>
+      <ApprovalsContent searchParams={searchParams} />
+    </Suspense>
+  );
 }

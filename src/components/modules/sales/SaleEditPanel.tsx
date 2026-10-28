@@ -4,6 +4,7 @@ import { useState } from "react";
 import { rp } from "@/lib/format";
 import { saleCost, saleOps, saleSub, variantLabel } from "@/lib/calc";
 import { useStore } from "@/lib/store";
+import { MoneyInput } from "@/components/ui/NumericInput";
 import type { Sale } from "@/lib/types";
 
 /**
@@ -69,11 +70,10 @@ export function SaleEditPanel({
                 {it.qty} unit · modal {rp(it.cost)}
               </div>
               <div className="col-span-8">
-                <input
-                  type="number"
+                <MoneyInput
                   aria-label={`Harga jual ${variantLabel(db, it.vid)}`}
                   value={it.price}
-                  onChange={(e) => setPrice(i, +e.target.value)}
+                  onChange={(price) => setPrice(i, price)}
                 />
               </div>
             </div>
@@ -85,30 +85,18 @@ export function SaleEditPanel({
       </div>
 
       <div className="dsec">Biaya operasional order</div>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         <div>
           <label className="f">Ekspedisi / ongkir</label>
-          <input
-            type="number"
-            value={ship}
-            onChange={(e) => setShip(+e.target.value)}
-          />
+          <MoneyInput value={ship} onChange={setShip} />
         </div>
         <div>
           <label className="f">Packing</label>
-          <input
-            type="number"
-            value={pack}
-            onChange={(e) => setPack(+e.target.value)}
-          />
+          <MoneyInput value={pack} onChange={setPack} />
         </div>
         <div>
           <label className="f">Biaya lain</label>
-          <input
-            type="number"
-            value={other}
-            onChange={(e) => setOther(+e.target.value)}
-          />
+          <MoneyInput value={other} onChange={setOther} />
         </div>
       </div>
 

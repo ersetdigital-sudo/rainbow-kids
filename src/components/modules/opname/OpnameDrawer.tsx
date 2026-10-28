@@ -7,6 +7,7 @@ import { findVariant, opnameDiff } from "@/lib/calc";
 import { useStore } from "@/lib/store";
 import { Badge } from "@/components/ui/Badge";
 import { Drawer } from "@/components/ui/Drawer";
+import { NumberInput } from "@/components/ui/NumericInput";
 import type { Opname } from "@/lib/types";
 
 const CAUSES = [
@@ -164,15 +165,15 @@ export function OpnameDrawer({
                   </td>
                   <td data-label="Fisik" className="r">
                     {editable ? (
-                      <input
-                        type="number"
+                      <NumberInput
                         className="w-20 text-right"
-                        value={l.phys === "" ? "" : l.phys}
-                        onChange={(e) =>
-                          updateOpnameLine(o.id, i, {
-                            phys: e.target.value === "" ? "" : +e.target.value,
-                          })
+                        value={l.phys}
+                        onChange={(phys) =>
+                          updateOpnameLine(o.id, i, { phys })
                         }
+                        allowEmpty
+                        zeroAsEmpty={false}
+                        placeholder=""
                       />
                     ) : l.phys === "" ? (
                       l.sys

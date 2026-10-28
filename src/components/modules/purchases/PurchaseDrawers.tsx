@@ -8,6 +8,7 @@ import { useStore, type PurchaseDraft } from "@/lib/store";
 import type { Purchase } from "@/lib/types";
 import { Badge } from "@/components/ui/Badge";
 import { Drawer } from "@/components/ui/Drawer";
+import { MoneyInput, NumberInput } from "@/components/ui/NumericInput";
 import { Picker } from "@/components/ui/Picker";
 
 /* ---------- Form pembelian ---------- */
@@ -169,18 +170,16 @@ export function PurchaseFormDrawer({
                   </div>
                   <div className="col-span-3 sm:col-span-2">
                     <label className="f">Qty</label>
-                    <input
-                      type="number"
+                    <NumberInput
                       value={it.qty}
-                      onChange={(e) => setItem(i, { qty: +e.target.value })}
+                      onChange={(qty) => setItem(i, { qty })}
                     />
                   </div>
                   <div className="col-span-7 sm:col-span-3">
                     <label className="f">Harga satuan</label>
-                    <input
-                      type="number"
+                    <MoneyInput
                       value={it.cost}
-                      onChange={(e) => setItem(i, { cost: +e.target.value })}
+                      onChange={(cost) => setItem(i, { cost })}
                     />
                   </div>
                   <div className="col-span-2 sm:col-span-1">

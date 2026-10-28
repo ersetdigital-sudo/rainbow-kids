@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useStore } from "@/lib/store";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { PageHead } from "@/components/ui/PageHead";
+import { EditUserDrawer } from "./EditUserDrawer";
 import { InviteUserDrawer } from "./InviteUserDrawer";
 import type { AppUser, ModuleKey, Role } from "@/lib/types";
 
@@ -19,6 +20,13 @@ const MODULES: [ModuleKey, string][] = [
   ["users", "Pengguna"],
 ];
 
+const ROLE_NOTES: [Role, string][] = [
+  ["Owner", "Semua akses + menyetujui pengajuan"],
+  ["Admin", "Mengelola data operasional"],
+  ["Approver", "Bisa menyetujui pengajuan"],
+  ["User", "Input data & mengajukan perubahan"],
+];
+
 const TONE: Record<string, string> = {
   Tidak: "b-er",
   Lihat: "b-in",
@@ -31,6 +39,7 @@ const TONE: Record<string, string> = {
 export function UsersView() {
   const { db, setUserRole, toggleUser, cyclePerm, toast } = useStore();
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const columns: Column<AppUser>[] = [
     {
@@ -87,6 +96,23 @@ export function UsersView() {
         </button>
       ),
     },
+    {
+      key: "edit",
+      label: "",
+      noLabel: true,
+      align: "right",
+      render: (u, i) => (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            className="btn s"
+            onClick={() => setEditIndex(i)}
+          >
+            Edit
+          </button>
+        </div>
+      ),
+    },
   ];
 
   return (
@@ -104,6 +130,23 @@ export function UsersView() {
           </button>
         }
       />
+
+      <div className="card p-3 mb-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
+        {ROLE_NOTES.map(([role, note]) => (
+          <div
+            key={role}
+            className="rounded-xl px-3 py-2"
+            style={{ background: "#f7f9fc" }}
+          >
+            <div className="text-xs font-bold" style={{ color: "var(--nv)" }}>
+              {role}
+            </div>
+            <div className="text-[11.5px]" style={{ color: "var(--mu)" }}>
+              {note}
+            </div>
+          </div>
+        ))}
+      </div>
 
       <div className="card mb-4">
         <DataTable
@@ -183,6 +226,12 @@ export function UsersView() {
       </div>
 
       <InviteUserDrawer open={inviteOpen} onClose={() => setInviteOpen(false)} />
+      <EditUserDrawer
+        key={`edit-user-${editIndex ?? "none"}`}
+        user={editIndex === null ? null : (db.users[editIndex] ?? null)}
+        index={editIndex ?? 0}
+        onClose={() => setEditIndex(null)}
+      />
     </>
   );
 }

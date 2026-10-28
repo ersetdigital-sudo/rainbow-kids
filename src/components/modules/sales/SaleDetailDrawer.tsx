@@ -19,6 +19,7 @@ import {
 import { useStore } from "@/lib/store";
 import { Badge } from "@/components/ui/Badge";
 import { Drawer } from "@/components/ui/Drawer";
+import { MoneyInput } from "@/components/ui/NumericInput";
 import { SaleEditPanel } from "./SaleEditPanel";
 
 const ICONS = {
@@ -289,11 +290,7 @@ export function SaleDetailDrawer({
               </div>
               <div>
                 <label className="f">Jumlah</label>
-                <input
-                  type="number"
-                  value={payAmt}
-                  onChange={(e) => setPayAmt(+e.target.value)}
-                />
+                <MoneyInput value={payAmt} onChange={setPayAmt} />
               </div>
               <div>
                 <label className="f">Metode</label>

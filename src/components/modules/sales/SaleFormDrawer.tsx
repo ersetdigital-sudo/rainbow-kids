@@ -6,6 +6,7 @@ import { rp } from "@/lib/format";
 import { salePriceHistory } from "@/lib/calc";
 import { useStore, type SaleDraft } from "@/lib/store";
 import { Drawer } from "@/components/ui/Drawer";
+import { MoneyInput, NumberInput } from "@/components/ui/NumericInput";
 import { Picker } from "@/components/ui/Picker";
 import type { CustomerType } from "@/lib/types";
 
@@ -187,19 +188,16 @@ export function SaleFormDrawer({
                   </div>
                   <div className="col-span-3 sm:col-span-2">
                     <label className="f">Qty</label>
-                    <input
-                      type="number"
-                      min={1}
+                    <NumberInput
                       value={it.qty}
-                      onChange={(e) => setItem(i, { qty: +e.target.value })}
+                      onChange={(qty) => setItem(i, { qty })}
                     />
                   </div>
                   <div className="col-span-7 sm:col-span-3">
                     <label className="f">Harga jual</label>
-                    <input
-                      type="number"
+                    <MoneyInput
                       value={it.price}
-                      onChange={(e) => setItem(i, { price: +e.target.value })}
+                      onChange={(price) => setItem(i, { price })}
                     />
                   </div>
                   <div className="col-span-2 sm:col-span-1">
@@ -268,29 +266,26 @@ export function SaleFormDrawer({
         )}
 
         <div className="dsec">Biaya operasional order</div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           <div>
             <label className="f">Ongkir</label>
-            <input
-              type="number"
+            <MoneyInput
               value={draft.ship}
-              onChange={(e) => setDraft({ ...draft, ship: +e.target.value })}
+              onChange={(ship) => setDraft({ ...draft, ship })}
             />
           </div>
           <div>
             <label className="f">Packing</label>
-            <input
-              type="number"
+            <MoneyInput
               value={draft.pack}
-              onChange={(e) => setDraft({ ...draft, pack: +e.target.value })}
+              onChange={(pack) => setDraft({ ...draft, pack })}
             />
           </div>
           <div>
             <label className="f">Biaya lain</label>
-            <input
-              type="number"
+            <MoneyInput
               value={draft.other}
-              onChange={(e) => setDraft({ ...draft, other: +e.target.value })}
+              onChange={(other) => setDraft({ ...draft, other })}
             />
           </div>
         </div>
@@ -298,10 +293,9 @@ export function SaleFormDrawer({
         {draft.type === "tempo" && (
           <div className="mt-3">
             <label className="f">Uang muka / bayar sebagian (opsional)</label>
-            <input
-              type="number"
+            <MoneyInput
               value={draft.paid}
-              onChange={(e) => setDraft({ ...draft, paid: +e.target.value })}
+              onChange={(paid) => setDraft({ ...draft, paid })}
             />
           </div>
         )}
