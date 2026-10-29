@@ -63,7 +63,7 @@ export function StoreSettingsView() {
             </div>
             <div>
               <label className="f">NPWP (opsional)</label>
-              <input {...field("npwp")} placeholder="00.000.000.0-000.000" />
+              <input {...field("npwp")} placeholder="Kosongkan bila tidak perlu dicetak" />
             </div>
             <div>
               <label className="f">Rekening utama toko</label>
@@ -134,8 +134,12 @@ export function StoreSettingsView() {
                 {form.addr || "Alamat toko"}
                 <br />
                 {form.phone || "Telepon"} · {form.email || "Email"}
-                <br />
-                NPWP {form.npwp || "—"}
+                {form.npwp?.trim() ? (
+                  <>
+                    <br />
+                    NPWP {form.npwp}
+                  </>
+                ) : null}
               </div>
             </div>
           </div>

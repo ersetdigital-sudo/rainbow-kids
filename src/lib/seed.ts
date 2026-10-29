@@ -402,7 +402,7 @@ export function seed(): DB {
       addr: "Jl. Pelangi Raya No. 8, Bandung 40115",
       phone: "0812-2233-4455",
       email: "halo@rainbowkids.id",
-      npwp: "01.234.567.8-423.000",
+      npwp: "",
       bank: "BCA 123-456-7890 a.n. Rainbow Kids",
     },
     user: "Budi (Owner)",

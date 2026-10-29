@@ -150,8 +150,12 @@ export function InvoiceView({ invoiceId }: { invoiceId?: string }) {
                   {b.addr}
                   <br />
                   {b.phone} · {b.email}
-                  <br />
-                  NPWP {b.npwp}
+                  {b.npwp?.trim() ? (
+                    <>
+                      <br />
+                      NPWP {b.npwp}
+                    </>
+                  ) : null}
                 </div>
               </div>
             </div>
