@@ -193,7 +193,7 @@ export function SaleFormDrawer({
           <div
             className="mt-3 rounded-xl px-3 py-2 text-[12px]"
             style={{
-              background: "var(--warn-bg)",
+              background: "var(--color-warn-bg)",
               border: "1px solid #f6e4a6",
               color: "var(--wa)",
             }}

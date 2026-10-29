@@ -64,7 +64,7 @@ export function OverdueWarningDialog({
               <div
                 className="rounded-xl px-3 py-2 text-[12.5px]"
                 style={{
-                  background: "var(--danger-bg)",
+                  background: "var(--color-danger-bg)",
                   border: "1px solid #f6caca",
                   color: "#b91c1c",
                 }}
