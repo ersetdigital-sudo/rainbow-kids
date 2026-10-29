@@ -33,7 +33,6 @@ import type {
   Biz,
   CostChange,
   Customer,
-  CustomerType,
   DB,
   ModuleKey,
   OpnameLine,
@@ -78,7 +77,7 @@ export type Result = {
   msg: string;
   /** Peringatan non-blocking, mis. stok jadi minus. */
   warnings?: string[];
-  /** Data yang baru dibuat (pelanggan/supplier baru). */
+  /** Data yang baru dibuat (toko/supplier baru). */
   customer?: Customer;
   supplier?: Supplier;
 };
@@ -157,23 +156,24 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
-  /* ---------------- Pelanggan & supplier ---------------- */
+  /* ---------------- Toko & supplier ---------------- */
 
   const addCustomer = useCallback<StoreValue["addCustomer"]>(
     (c) => {
       const name = c.name.trim();
-      if (!name) return { ok: false, msg: "Isi nama pelanggan" };
+      if (!name) return { ok: false, msg: "Isi nama toko" };
       const exists = getSnapshot().customers.some(
         (x) => x.name.toLowerCase() === name.toLowerCase(),
       );
-      if (exists) return { ok: false, msg: "Pelanggan dengan nama itu sudah ada" };
+      if (exists) return { ok: false, msg: "Toko dengan nama itu sudah ada" };
       const customer: Customer = {
         id: uid("c"),
         name,
-        type: c.type,
+        // Semua pelanggan tercatat sebagai toko; rekening tujuan transfer
+        // diambil dari Pengaturan Toko, bukan per toko.
+        type: "Toko",
         phone: c.phone?.trim() || undefined,
         address: c.address?.trim() || undefined,
-        bank: c.bank?.trim() || undefined,
         status: "Menunggu",
       };
       const time = nowStamp();
@@ -185,7 +185,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           {
             id: `AP-${String(prev.approvals.length + 1).padStart(3, "0")}`,
             kind: "customer" as const,
-            type: "Pelanggan baru",
+            type: "Toko baru",
             before: "—",
             after: "Menunggu",
             customerId: customer.id,
@@ -198,27 +198,27 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       }));
       return {
         ok: true,
-        msg: `Pelanggan ${name} ditambahkan — menunggu approval Owner`,
+        msg: `Toko ${name} ditambahkan — menunggu approval Owner`,
         customer,
       };
     },
     [],
   );
 
-  /** Ubah data pelanggan (nama, jenis, HP, alamat, tujuan transfer). */
+  /** Ubah data toko (nama, HP, alamat). Jenis & rekening lama dibiarkan. */
   const updateCustomer = useCallback<StoreValue["updateCustomer"]>(
     (id, patch) => {
       const name = patch.name.trim();
-      if (!name) return { ok: false, msg: "Isi nama pelanggan" };
+      if (!name) return { ok: false, msg: "Isi nama toko" };
       const current = getSnapshot();
       if (!current.customers.some((c) => c.id === id))
-        return { ok: false, msg: "Pelanggan tidak ditemukan" };
+        return { ok: false, msg: "Toko tidak ditemukan" };
       if (
         current.customers.some(
           (c) => c.id !== id && c.name.toLowerCase() === name.toLowerCase(),
         )
       )
-        return { ok: false, msg: "Pelanggan dengan nama itu sudah ada" };
+        return { ok: false, msg: "Toko dengan nama itu sudah ada" };
 
       setSnapshot((prev) => ({
         ...prev,
@@ -227,19 +227,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             ? {
                 ...c,
                 name,
-                type: patch.type,
                 phone: patch.phone?.trim() || undefined,
                 address: patch.address?.trim() || undefined,
-                bank: patch.bank?.trim() || undefined,
               }
             : c,
         ),
-        // Nama pelanggan di invoice lama ikut diperbarui agar konsisten.
+        // Nama toko di invoice lama ikut diperbarui agar konsisten.
         sales: prev.sales.map((s) =>
           s.customerId === id ? { ...s, customer: name } : s,
         ),
       }));
-      return { ok: true, msg: "Data pelanggan diperbarui" };
+      return { ok: true, msg: "Data toko diperbarui" };
     },
     [],
   );
@@ -253,7 +251,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
     const current = getSnapshot();
     const customer = current.customers.find((c) => c.id === customerId);
-    if (!customer) return { ok: false, msg: "Pelanggan tidak ditemukan" };
+    if (!customer) return { ok: false, msg: "Toko tidak ditemukan" };
 
     const outstanding = current.sales.some(
       (s) =>
@@ -284,7 +282,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         {
           id: `AP-${String(prev.approvals.length + 1).padStart(3, "0")}`,
           kind: "customerDelete" as const,
-          type: "Hapus pelanggan",
+          type: "Hapus toko",
           before: customerStatus(customer),
           after: "Dihapus",
           customerId,
@@ -323,7 +321,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const saveSale = useCallback((draft: SaleDraft): Result => {
     const current = getSnapshot();
     if (!draft.customer.trim())
-      return { ok: false, msg: "Isi nama pelanggan dulu" };
+      return { ok: false, msg: "Isi nama toko dulu" };
     if (!draft.items.length)
       return { ok: false, msg: "Tambahkan minimal satu barang" };
 
@@ -996,7 +994,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const a = prev.approvals.find((x) => x.id === id);
       if (!a) return prev;
 
-      // Pelanggan baru — disetujui jadi Aktif, ditolak jadi Diarsipkan.
+      // Toko baru — disetujui jadi Aktif, ditolak jadi Diarsipkan.
       if (a.kind === "customer") {
         return {
           ...prev,
@@ -1016,7 +1014,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
-      // Hapus pelanggan — hapus permanen jika belum pernah transaksi,
+      // Hapus toko — hapus permanen jika belum pernah transaksi,
       // selain itu arsipkan supaya riwayat transaksi tetap utuh.
       if (a.kind === "customerDelete") {
         let customers = prev.customers;
@@ -1660,19 +1658,15 @@ type StoreValue = {
   updateBiz: (patch: Biz) => Result;
   addCustomer: (c: {
     name: string;
-    type: CustomerType;
     phone?: string;
     address?: string;
-    bank?: string;
   }) => Result;
   updateCustomer: (
     id: string,
     patch: {
       name: string;
-      type: CustomerType;
       phone?: string;
       address?: string;
-      bank?: string;
     },
   ) => Result;
   requestCustomerDelete: (customerId: string, reason: string) => Result;

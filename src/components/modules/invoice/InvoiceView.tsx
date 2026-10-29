@@ -70,12 +70,9 @@ export function InvoiceView({ invoiceId }: { invoiceId?: string }) {
   }
 
   const b = db.biz;
-  // Rekening tujuan transfer berasal dari data pelanggan; rekening utama toko
-  // hanya dipakai bila pelanggan belum punya rekening sendiri.
-  const customer =
-    db.customers.find((c) => c.id === sale.customerId) ??
-    db.customers.find((c) => c.name === sale.customer);
-  const transferTo = customer?.bank?.trim() || b.bank;
+  // Rekening tujuan transfer selalu dari Pengaturan Toko (satu rekening
+  // untuk semua invoice), tidak lagi per toko.
+  const transferTo = b.bank;
   const st = arStatus(sale);
   const statusStyle =
     st === "Lunas"
@@ -337,12 +334,12 @@ export function InvoiceView({ invoiceId }: { invoiceId?: string }) {
         </Link>
       </p>
 
-      {/* Panel internal: tidak ikut tercetak, tidak tampil di dokumen pelanggan. */}
+      {/* Panel internal: tidak ikut tercetak, tidak tampil di dokumen toko. */}
       <div className="card p-5 mt-4 no-print">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="font-bold">Rincian internal invoice</div>
           <span className="text-xs" style={{ color: "var(--mu)" }}>
-            Untuk akuntansi toko — tidak dicetak ke pelanggan
+            Untuk catatan internal — tidak ikut dicetak di invoice
           </span>
         </div>
 

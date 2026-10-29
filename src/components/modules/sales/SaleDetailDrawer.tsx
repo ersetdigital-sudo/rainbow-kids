@@ -262,8 +262,7 @@ export function SaleDetailDrawer({
               {sale.customer}
             </div>
             <div className="text-[11.5px]" style={{ color: "var(--mu)" }}>
-              {customer?.type ?? "Pelanggan"}
-              {customer?.phone ? ` · ${customer.phone}` : ""}
+              {customer?.phone ? customer.phone : "Toko"}
             </div>
             <div className="flex flex-wrap gap-1 mt-1">
               {customerSt === "Menunggu" && (
@@ -468,7 +467,7 @@ export function SaleDetailDrawer({
         onClose={() => setDeleteOpen(false)}
         title="Ajukan hapus order"
         description={`Order ${sale.id} milik ${sale.customer} akan dihapus setelah disetujui Owner. Stok setiap barang dikembalikan dan approval ubah harga/pelunasan yang masih menunggu otomatis ditolak.`}
-        placeholder="Contoh: order dibatalkan pelanggan / salah input"
+        placeholder="Contoh: order dibatalkan toko / salah input"
         onConfirm={(reason) => {
           const res = requestSaleDelete(sale.id, reason);
           toast(res.msg);

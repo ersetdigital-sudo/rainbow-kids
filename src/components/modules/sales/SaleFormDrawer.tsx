@@ -15,7 +15,6 @@ import { Drawer } from "@/components/ui/Drawer";
 import { MoneyInput, NumberInput } from "@/components/ui/NumericInput";
 import { OverdueWarningDialog } from "@/components/ui/OverdueWarningDialog";
 import { Picker } from "@/components/ui/Picker";
-import type { CustomerType } from "@/lib/types";
 
 export function SaleFormDrawer({
   open,
@@ -40,10 +39,8 @@ export function SaleFormDrawer({
   );
 
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [newType, setNewType] = useState<CustomerType>("Toko");
   const [newPhone, setNewPhone] = useState("");
   const [newAddress, setNewAddress] = useState("");
-  const [newBank, setNewBank] = useState("");
   const [overdueOpen, setOverdueOpen] = useState(false);
   const [overdueAck, setOverdueAck] = useState(false);
 
@@ -137,7 +134,7 @@ export function SaleFormDrawer({
       >
         <div className="grid sm:grid-cols-2 gap-3">
           <div>
-            <label className="f">Pelanggan</label>
+            <label className="f">Toko</label>
             <button
               type="button"
               className="btn w-full justify-between"
@@ -149,7 +146,7 @@ export function SaleFormDrawer({
                 style={draft.customer ? undefined : { color: "var(--mu)" }}
               >
                 <span className="truncate">
-                  {draft.customer || "Pilih pelanggan..."}
+                  {draft.customer || "Pilih toko..."}
                 </span>
                 {selectedStatus === "Menunggu" && (
                   <span className="bd b-wa flex-none">Menunggu approval</span>
@@ -381,7 +378,7 @@ export function SaleFormDrawer({
       <Picker
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
-        title="Pelanggan"
+        title="Toko"
         value={draft.customerId}
         options={db.customers
           .filter((c) => customerStatus(c) !== "Diarsipkan")
@@ -389,14 +386,10 @@ export function SaleFormDrawer({
             id: c.id,
             name: c.name,
             sub: c.phone,
-            badges: (
-              <>
-                <span className="bd b-in">{c.type}</span>
-                {customerStatus(c) === "Menunggu" && (
-                  <span className="bd b-wa">Menunggu approval</span>
-                )}
-              </>
-            ),
+            badges:
+              customerStatus(c) === "Menunggu" ? (
+                <span className="bd b-wa">Menunggu approval</span>
+              ) : undefined,
           }))}
         onSelect={(o) => {
           const customer = db.customers.find((c) => c.id === o.id);
@@ -412,10 +405,8 @@ export function SaleFormDrawer({
         onCreate={(name) => {
           const res = addCustomer({
             name,
-            type: newType,
             phone: newPhone,
             address: newAddress,
-            bank: newBank,
           });
           if (res.ok && res.customer) {
             toast(res.msg);
@@ -426,29 +417,18 @@ export function SaleFormDrawer({
             }));
             setNewPhone("");
             setNewAddress("");
-            setNewBank("");
             setOverdueAck(false);
             setOverdueOpen(false);
           }
           return res;
         }}
-        createLabel="Tambah pelanggan baru"
-        createExtra={          <div className="grid sm:grid-cols-2 gap-2 mb-2">
-            <div>
-              <label className="f">Jenis</label>
-              <select
-                value={newType}
-                onChange={(e) => setNewType(e.target.value as CustomerType)}
-              >
-                <option value="Toko">Toko</option>
-                <option value="Reseller">Reseller</option>
-                <option value="Ritel">Ritel</option>
-              </select>
-            </div>
+        createLabel="Tambah toko baru"
+        createExtra={
+          <div className="grid sm:grid-cols-2 gap-2 mb-2">
             <div>
               <label className="f">No. HP (opsional)</label>
               <input
-                aria-label="No. HP pelanggan baru"
+                aria-label="No. HP toko baru"
                 value={newPhone}
                 onChange={(e) => setNewPhone(e.target.value)}
                 placeholder="0812-xxxx-xxxx"
@@ -457,19 +437,10 @@ export function SaleFormDrawer({
             <div>
               <label className="f">Alamat (opsional)</label>
               <input
-                aria-label="Alamat pelanggan baru"
+                aria-label="Alamat toko baru"
                 value={newAddress}
                 onChange={(e) => setNewAddress(e.target.value)}
                 placeholder="Jl. ..."
-              />
-            </div>
-            <div>
-              <label className="f">Tujuan transfer (opsional)</label>
-              <input
-                aria-label="Tujuan transfer pelanggan baru"
-                value={newBank}
-                onChange={(e) => setNewBank(e.target.value)}
-                placeholder="mis. BCA 1234567890 a.n. Toko"
               />
             </div>
           </div>

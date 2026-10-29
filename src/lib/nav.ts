@@ -38,7 +38,7 @@ export const NAV: NavGroup[] = [
     items: [
       { href: "/", label: "Dashboard", icon: "dash" },
       { href: "/sales", label: "Penjualan", icon: "sales" },
-      { href: "/customers", label: "Data Pelanggan", icon: "cust" },
+      { href: "/customers", label: "Data Toko", icon: "cust" },
       { href: "/ar", label: "Piutang & Pembayaran", icon: "ar" },
       { href: "/invoice", label: "Invoice", icon: "invoice" },
     ],

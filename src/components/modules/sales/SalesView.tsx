@@ -53,7 +53,7 @@ export function SalesView() {
     [db.sales, query, type, pay],
   );
 
-  /** Data pelanggan terbaru untuk kolom kontak & rekening di file ekspor. */
+  /** Data toko terbaru untuk kolom kontak di file ekspor. */
   const customerOf = (s: Sale) =>
     db.customers.find((c) => c.id === s.customerId) ??
     db.customers.find((c) => c.name === s.customer);
@@ -76,10 +76,9 @@ export function SalesView() {
         "No. Invoice",
         "Tanggal order",
         "Jatuh tempo",
-        "Pelanggan",
+        "Toko",
         "No. HP",
         "Alamat",
-        "Tujuan Transfer",
         "Jenis",
         "Total",
         "Modal",
@@ -96,7 +95,6 @@ export function SalesView() {
         s.customer,
         customerOf(s)?.phone?.trim() || "-",
         customerOf(s)?.address?.trim() || "-",
-        customerOf(s)?.bank?.trim() || "-",
         s.type === "tempo" ? "Tempo" : "Tunai",
         rp(saleTotal(s)),
         rp(saleCost(s)),
@@ -128,7 +126,7 @@ export function SalesView() {
     { key: "date", label: "Tanggal", render: (s) => formatDate(s.date) },
     {
       key: "customer",
-      label: "Pelanggan",
+      label: "Toko",
       cellClass: "h-wrap",
       render: (s) => (
         <div>
@@ -182,7 +180,7 @@ export function SalesView() {
         <div className="flex flex-wrap gap-2 p-4">
           <input
             className="max-w-xs"
-            placeholder="Cari no. invoice / pelanggan"
+            placeholder="Cari no. invoice / toko"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />

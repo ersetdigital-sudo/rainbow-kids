@@ -285,7 +285,7 @@ function ProfitTab({
       label: "Invoice",
       render: (s) => <span className="font-semibold">{s.id}</span>,
     },
-    { key: "customer", label: "Pelanggan", render: (s) => s.customer },
+    { key: "customer", label: "Toko", render: (s) => s.customer },
     {
       key: "sub",
       label: "Penjualan",
@@ -645,7 +645,7 @@ function ArTab() {
   const columns: Column<string>[] = [
     {
       key: "cust",
-      label: "Pelanggan",
+      label: "Toko",
       render: (c) => <span className="font-semibold">{c}</span>,
     },
     {
@@ -708,8 +708,8 @@ function ArTab() {
           bg="#FEF3DC"
         />
         <Kpi
-          label="Pelanggan berutang"
-          value={`${customers.length} pelanggan`}
+          label="Toko berutang"
+          value={`${customers.length} toko`}
           sub="Tagihan aktif"
           icon="trend"
           color="#9A6F00"
@@ -718,8 +718,8 @@ function ArTab() {
       </div>
 
       <Sec
-        title="Piutang per pelanggan"
-        sub="Pelanggan dengan sisa terbesar ditandai gold"
+        title="Piutang per toko"
+        sub="Toko dengan sisa terbesar ditandai gold"
       >
         <HBarList rows={cr} />
       </Sec>

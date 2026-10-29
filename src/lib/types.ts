@@ -40,7 +40,7 @@ export type Customer = {
   type: CustomerType;
   phone?: string;
   address?: string;
-  /** Rekening tujuan transfer khusus pelanggan ini (tampil di invoice). */
+  /** Rekening tujuan transfer khusus toko ini (tampil di invoice). */
   bank?: string;
   /** Opsional; data lama tanpa status dianggap "Aktif". */
   status?: CustomerStatus;
@@ -192,10 +192,10 @@ export type Approval = {
   after: string | number;
   saleId?: string;
   purchaseId?: string;
-  /** Pelanggan terkait approval kind "customer" / "customerDelete". */
+  /** Toko terkait approval kind "customer" / "customerDelete". */
   customerId?: string;
   customerName?: string;
-  /** Alasan pengajuan hapus pelanggan / order. */
+  /** Alasan pengajuan hapus toko / order. */
   reason?: string;
   /** Snapshot penjualan saat pengajuan hapus order. */
   saleSnapshot?: Sale;

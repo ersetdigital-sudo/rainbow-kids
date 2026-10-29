@@ -366,7 +366,7 @@ export function DashboardView() {
                 <input
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
-                  placeholder="Cari pelanggan / nomor..."
+                  placeholder="Cari toko / nomor..."
                   aria-label="Cari transaksi"
                 />
               </label>
@@ -392,7 +392,7 @@ export function DashboardView() {
                 <thead>
                   <tr>
                     <th>No.</th>
-                    <th>Pelanggan</th>
+                    <th>Toko</th>
                     <th>Tanggal</th>
                     <th>Jenis</th>
                     <th className="r">Total</th>
@@ -409,7 +409,7 @@ export function DashboardView() {
                       <td data-label="No." className="font-semibold">
                         {s.id}
                       </td>
-                      <td data-label="Pelanggan">{s.customer}</td>
+                      <td data-label="Toko">{s.customer}</td>
                       <td data-label="Tanggal" style={{ color: "#71717a" }}>
                         {formatDate(s.date)}
                       </td>

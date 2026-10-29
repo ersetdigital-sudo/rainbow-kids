@@ -12,7 +12,7 @@ export type PickerOption = {
 };
 
 /**
- * Popup pemilih data (pelanggan / supplier): cari, pilih, atau tambah baru
+ * Popup pemilih data (toko / supplier): cari, pilih, atau tambah baru
  * langsung dari dalam popup.
  */
 export function Picker({

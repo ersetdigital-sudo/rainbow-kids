@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { CustomersView } from "@/components/modules/customers/CustomersView";
 
 export const metadata: Metadata = {
-  title: "Data Pelanggan",
+  title: "Data Toko",
   description:
-    "Kelola data pelanggan Rainbow Kids: no. HP, alamat, dan rekening tujuan transfer yang tampil di invoice.",
+    "Kelola data toko Rainbow Kids: nama, no. HP, dan alamat tiap toko.",
   alternates: { canonical: "/customers" },
 };
 

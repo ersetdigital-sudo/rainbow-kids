@@ -2,7 +2,7 @@ import { purchaseTotal, saleProfit, saleTotal } from "./calc";
 import { formatMonth } from "./date";
 import type { DB } from "./types";
 
-/** Histori per pelanggan (penjualan) atau per supplier (pembelian). */
+/** Histori per toko (penjualan) atau per supplier (pembelian). */
 export type HistorySide = "customer" | "supplier";
 export type HistoryMode = "month" | "year";
 
@@ -11,7 +11,7 @@ export type Movement = {
   name: string;
   date: string;
   total: number;
-  /** Laba order (pelanggan) atau jumlah unit (supplier). */
+  /** Laba order (toko) atau jumlah unit (supplier). */
   extra: number;
   items: { vid: string; qty: number; value: number }[];
 };
@@ -83,7 +83,7 @@ export type Group = {
   last: string;
 };
 
-/** Peringkat pelanggan / supplier pada satu periode (null = semua waktu). */
+/** Peringkat toko / supplier pada satu periode (null = semua waktu). */
 export function groupsOf(
   rows: Movement[],
   mode: HistoryMode,

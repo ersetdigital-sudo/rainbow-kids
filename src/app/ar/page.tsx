@@ -4,7 +4,7 @@ import { ReceivablesView } from "@/components/modules/receivables/ReceivablesVie
 export const metadata: Metadata = {
   title: "Piutang & Pembayaran",
   description:
-    "Pantau tagihan tempo pelanggan, status jatuh tempo, dan catat pembayaran sebagian untuk_piutang toko.",
+    "Pantau tagihan tempo toko, status jatuh tempo, dan catat pembayaran sebagian untuk_piutang toko.",
   alternates: { canonical: "/ar" },
 };
 

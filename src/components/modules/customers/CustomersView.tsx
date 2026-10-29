@@ -44,15 +44,14 @@ export function CustomersView() {
         (!q ||
           c.name.toLowerCase().includes(q) ||
           (c.phone ?? "").toLowerCase().includes(q) ||
-          (c.address ?? "").toLowerCase().includes(q) ||
-          (c.bank ?? "").toLowerCase().includes(q)),
+          (c.address ?? "").toLowerCase().includes(q)),
     );
   }, [db.customers, query, showArchived]);
 
   const columns: Column<Customer>[] = [
     {
       key: "name",
-      label: "Pelanggan",
+      label: "Toko",
       render: (c) => {
         const status = customerStatus(c);
         return (
@@ -62,7 +61,6 @@ export function CustomersView() {
               className="text-[11px] flex items-center gap-1.5 flex-wrap mt-0.5"
               style={{ color: "var(--mu)" }}
             >
-              <span>{c.type}</span>
               {status === "Menunggu" && (
                 <span className="bd b-wa">Menunggu approval</span>
               )}
@@ -83,12 +81,6 @@ export function CustomersView() {
       label: "Alamat",
       cellClass: "h-wrap",
       render: (c) => c.address || EMPTY,
-    },
-    {
-      key: "bank",
-      label: "Tujuan transfer",
-      cellClass: "h-wrap",
-      render: (c) => c.bank || EMPTY,
     },
     {
       key: "action",
@@ -126,15 +118,15 @@ export function CustomersView() {
   return (
     <>
       <PageHead
-        title="Data Pelanggan"
-        subtitle="Simpan no. HP, alamat, dan rekening tujuan transfer tiap pelanggan — rekening ini yang tampil di invoice."
+        title="Data Toko"
+        subtitle="Simpan no. HP dan alamat tiap toko. Rekening tujuan transfer invoice diatur di Pengaturan Toko."
         actions={
           <button
             type="button"
             className="btn p"
             onClick={() => setEditId("new")}
           >
-            + Pelanggan baru
+            + Toko baru
           </button>
         }
       />
@@ -160,7 +152,7 @@ export function CustomersView() {
           rows={list}
           rowKey={(c) => c.id}
           onRowClick={(c) => setEditId(c.id)}
-          emptyText="Tidak ada pelanggan yang cocok"
+          emptyText="Tidak ada toko yang cocok"
         />
       </div>
 
@@ -183,7 +175,7 @@ export function CustomersView() {
         placeholder="Contoh: toko sudah tidak aktif / pindah domisili"
         onConfirm={(reason) => {
           if (!deleteId)
-            return { ok: false, msg: "Pilih pelanggan terlebih dulu" };
+            return { ok: false, msg: "Pilih toko terlebih dulu" };
           const res = requestCustomerDelete(deleteId, reason);
           toast(res.msg);
           if (res.ok) setDeleteId(null);

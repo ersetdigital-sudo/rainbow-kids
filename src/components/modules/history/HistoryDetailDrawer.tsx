@@ -13,7 +13,7 @@ import {
   type HistorySide,
 } from "@/lib/history";
 
-/** Histori lengkap satu pelanggan (belanja) atau satu supplier (nota belanja). */
+/** Histori lengkap satu toko (belanja) atau satu supplier (nota belanja). */
 export function HistoryDetailDrawer({
   side,
   name,
@@ -35,7 +35,7 @@ export function HistoryDetailDrawer({
   const total = rows.reduce((a, r) => a + r.total, 0);
   const extra = rows.reduce((a, r) => a + r.extra, 0);
   const unit = side === "supplier";
-  const label = side === "customer" ? "Pelanggan" : "Supplier";
+  const label = side === "customer" ? "Toko" : "Supplier";
 
   return (
     <Drawer

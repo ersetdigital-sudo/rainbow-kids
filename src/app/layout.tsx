@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     "manajemen toko anak",
     "kasir toko anak",
     "stok opname",
-    "piutang pelanggan",
+    "piutang toko",
     "approval harga",
     "Rainbow Kids",
   ],

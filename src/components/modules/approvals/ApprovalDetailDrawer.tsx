@@ -79,20 +79,20 @@ export function ApprovalDetailDrawer({
 
   if (!a) return null;
 
-  /* ---------------- Pelanggan baru ---------------- */
+  /* ---------------- Toko baru ---------------- */
   if (a.kind === "customer") {
     const customer = db.customers.find((c) => c.id === a.customerId);
     return (
       <Drawer
         open={Boolean(approvalId)}
         onClose={onClose}
-        title="Detail pelanggan baru"
+        title="Detail toko baru"
         footer={<DecisionFooter approval={a} onClose={onClose} />}
       >
         <div className="sdtop">
           <div>
             <div className="text-xs" style={{ color: "var(--mu)" }}>
-              Pelanggan baru
+              Toko baru
             </div>
             <div
               className="font-extrabold text-lg"
@@ -109,13 +109,9 @@ export function ApprovalDetailDrawer({
             <span className="sdi">
               <Icon name="cust" />
             </span>
-            <span>Data pelanggan</span>
+            <span>Data toko</span>
           </div>
           <div className="text-[13px]">
-            <div className="flex justify-between py-1.5">
-              <span style={{ color: "var(--mu)" }}>Jenis</span>
-              <b style={{ color: "var(--nv)" }}>{customer?.type ?? "-"}</b>
-            </div>
             <div className="flex justify-between py-1.5">
               <span style={{ color: "var(--mu)" }}>No. HP</span>
               <b style={{ color: "var(--nv)" }}>{customer?.phone ?? "-"}</b>
@@ -130,7 +126,7 @@ export function ApprovalDetailDrawer({
         </div>
 
         <div className="sim">
-          Disetujui: pelanggan menjadi Aktif. Ditolak: pelanggan diarsipkan dan
+          Disetujui: toko menjadi Aktif. Ditolak: toko diarsipkan dan
           tidak bisa dipilih di transaksi baru.
         </div>
 
@@ -157,7 +153,7 @@ export function ApprovalDetailDrawer({
     );
   }
 
-  /* ---------------- Hapus pelanggan ---------------- */
+  /* ---------------- Hapus toko ---------------- */
   if (a.kind === "customerDelete") {
     const customer = db.customers.find((c) => c.id === a.customerId);
     const custStatus = customer ? customerStatus(customer) : null;
@@ -168,7 +164,7 @@ export function ApprovalDetailDrawer({
       <Drawer
         open={Boolean(approvalId)}
         onClose={onClose}
-        title="Detail hapus pelanggan"
+        title="Detail hapus toko"
         footer={<DecisionFooter approval={a} onClose={onClose} />}
       >
         <div className="sdtop">
@@ -199,7 +195,7 @@ export function ApprovalDetailDrawer({
         </div>
 
         <div className="sim">
-          Disetujui: {hasSales ? "pelanggan diarsipkan karena sudah punya transaksi." : "pelanggan dihapus permanen karena belum pernah transaksi."} Ditolak: data pelanggan tetap seperti semula.
+          Disetujui: {hasSales ? "toko diarsipkan karena sudah punya transaksi." : "toko dihapus permanen karena belum pernah transaksi."} Ditolak: data toko tetap seperti semula.
         </div>
 
         <div className="text-[13px] px-1 mt-3">
@@ -518,7 +514,7 @@ export function ApprovalDetailDrawer({
             </p>
             <p>
               Modal hanya tampil di layar internal ini dan tidak pernah dicetak pada
-              invoice pelanggan.
+              invoice toko.
             </p>
           </div>
           <div className="mt-2 pt-2 border-t text-[13px]" style={{ borderColor: "var(--ln)" }}>

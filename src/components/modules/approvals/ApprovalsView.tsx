@@ -218,7 +218,7 @@ export function ApprovalsView({ focusId = null }: { focusId?: string | null }) {
                             : a.kind === "sale"
                               ? "Harga & biaya invoice disetujui"
                               : a.kind === "customer"
-                                ? "Pelanggan disetujui — status Aktif"
+                                ? "Toko disetujui — status Aktif"
                                 : a.kind === "customerDelete"
                                   ? "Pengajuan hapus toko disetujui"
                                   : a.kind === "saleDelete"

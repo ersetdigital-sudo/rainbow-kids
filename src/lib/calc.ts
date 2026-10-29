@@ -49,12 +49,12 @@ export function arStatus(s: Sale, today = TODAY): ArStatus {
   return "Belum jatuh tempo";
 }
 
-/** Status pelanggan; data lama tanpa status dianggap aktif. */
+/** Status toko; data lama tanpa status dianggap aktif. */
 export const customerStatus = (customer: {
   status?: CustomerStatus;
 }): CustomerStatus => customer.status ?? "Aktif";
 
-/** Cocokkan sale ke pelanggan lewat ID, atau nama untuk data lama. */
+/** Cocokkan sale ke toko lewat ID, atau nama untuk data lama. */
 export function saleBelongsToCustomer(
   sale: Sale,
   customer: { id?: string; name: string },
@@ -68,7 +68,7 @@ export function saleBelongsToCustomer(
 }
 
 /**
- * Invoice milik pelanggan yang masih punya sisa tagihan dan sudah lewat
+ * Invoice milik toko yang masih punya sisa tagihan dan sudah lewat
  * jatuh tempo (due < TODAY). Invoice dengan pengajuan pelunasan tetap masuk.
  */
 export function overdueSales(

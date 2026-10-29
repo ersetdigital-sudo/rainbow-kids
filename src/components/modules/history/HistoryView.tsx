@@ -15,7 +15,7 @@ import {
 } from "@/lib/history";
 
 const SIDES: [HistorySide, string, string][] = [
-  ["customer", "Pelanggan", "Toko yang memesan — siapa belanja & prestasinya"],
+  ["customer", "Toko", "Toko yang memesan — siapa saja yang belanja & totalnya"],
   ["supplier", "Supplier", "Tempat kita belanja — apa saja & totalnya"],
 ];
 
@@ -42,7 +42,7 @@ export function HistoryView() {
   return (
     <>
       <PageHead
-        title="Histori Pelanggan & Supplier"
+        title="Histori Toko & Supplier"
         subtitle="Siapa saja yang belanja ke kita dan apa saja yang kita belanja dari tiap supplier — rekap bulanan dan tahunan."
       />
 
@@ -135,12 +135,12 @@ export function HistoryView() {
 
       <div className="card">
         <div className="px-5 pt-5 pb-3 font-bold flex flex-wrap items-center gap-2">
-          <span>Peringkat {unit ? "supplier" : "pelanggan"}</span>
+          <span>Peringkat {unit ? "supplier" : "toko"}</span>
           <span className="text-xs font-normal" style={{ color: "var(--mu)" }}>
             {period
               ? periods.find((b) => b.key === period)?.label
               : "semua waktu"}{" "}
-            · {groups.length} {unit ? "supplier" : "pelanggan"}
+            · {groups.length} {unit ? "supplier" : "toko"}
           </span>
         </div>
         {groups.length === 0 && (

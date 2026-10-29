@@ -31,8 +31,8 @@ const KIND_META: Record<
   payment: { label: "Pelunasan", icon: "ar" },
   purchase: { label: "Status Bayar Pembelian", icon: "purch" },
   sale: { label: "Ubah Harga & Biaya", icon: "invoice" },
-  customer: { label: "Pelanggan", icon: "cust" },
-  customerDelete: { label: "Hapus Pelanggan", icon: "cust" },
+  customer: { label: "Toko Baru", icon: "cust" },
+  customerDelete: { label: "Hapus Toko", icon: "cust" },
   saleDelete: { label: "Hapus Penjualan", icon: "sales" },
 };
 
@@ -143,13 +143,13 @@ function approvalActivity(db: DB, a: Approval): ActivityItem {
       const customer = db.customers.find((c) => c.id === a.customerId);
       return {
         ...base,
-        summary: `${a.customerName ?? customer?.name ?? "-"} · ${customer?.type ?? "Pelanggan"}`,
+        summary: a.customerName ?? customer?.name ?? "-",
         detail:
           a.status === "Menunggu"
-            ? "Pelanggan baru menunggu approval"
+            ? "Toko baru menunggu approval"
             : a.status === "Disetujui"
-              ? "Pelanggan disetujui — status Aktif"
-              : "Pelanggan ditolak — diarsipkan",
+              ? "Toko disetujui — status Aktif"
+              : "Toko ditolak — diarsipkan",
       };
     }
     case "customerDelete": {
@@ -157,7 +157,7 @@ function approvalActivity(db: DB, a: Approval): ActivityItem {
       return {
         ...base,
         summary: `${a.customerName ?? customer?.name ?? "-"}`,
-        detail: a.reason ? `Alasan: ${a.reason}` : "Pengajuan hapus pelanggan",
+        detail: a.reason ? `Alasan: ${a.reason}` : "Pengajuan hapus toko",
       };
     }
     case "saleDelete": {

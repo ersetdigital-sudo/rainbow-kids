@@ -95,7 +95,7 @@ export function ReceivablesView() {
       `piutang-rainbow-kids-${stamp()}`,
       [
         "No. Invoice",
-        "Pelanggan",
+        "Toko",
         "Tanggal",
         "Jatuh Tempo",
         "Total",
@@ -137,7 +137,7 @@ export function ReceivablesView() {
     },
     {
       key: "customer",
-      label: "Pelanggan",
+      label: "Toko",
       render: (s) => (
         <div>
           <div className="font-medium">{s.customer}</div>
@@ -332,7 +332,7 @@ export function ReceivablesView() {
               <path d="m20 20-3.5-3.5" />
             </svg>
             <input
-              placeholder="Cari no. invoice / nama pelanggan"
+              placeholder="Cari no. invoice / nama toko"
               aria-label="Cari tagihan"
               value={query}
               onChange={(e) => setQuery(e.target.value)}

@@ -90,8 +90,7 @@ export function StoreSettingsView() {
             </button>
           </div>
           <p className="text-[11.5px] mt-3" style={{ color: "var(--mu)" }}>
-            Rekening utama ini dipakai di invoice hanya bila pelanggan belum
-            punya rekening tujuan transfer sendiri.
+            Rekening ini dipakai sebagai tujuan transfer di semua invoice.
           </p>
         </div>
 

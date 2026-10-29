@@ -14,7 +14,7 @@ type Hit = {
   sub: string;
 };
 
-/** Pencarian cepat: invoice, pelanggan, dan produk. Ctrl/Cmd + K untuk fokus. */
+/** Pencarian cepat: invoice, toko, dan produk. Ctrl/Cmd + K untuk fokus. */
 export function GlobalSearch() {
   const { db } = useStore();
   const [q, setQ] = useState("");
@@ -73,9 +73,9 @@ export function GlobalSearch() {
         out.push({
           key: `c-${c.id}`,
           href: "/customers",
-          kind: "Pelanggan",
+          kind: "Toko",
           title: c.name,
-          sub: `${c.type}${c.phone ? ` · ${c.phone}` : ""}`,
+          sub: c.phone ? `Toko · ${c.phone}` : "Toko",
         }),
       );
 
@@ -120,7 +120,7 @@ export function GlobalSearch() {
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}
-        placeholder="Cari produk, invoice, pelanggan..."
+        placeholder="Cari produk, invoice, toko..."
         aria-label="Pencarian cepat"
         role="combobox"
         aria-expanded={show}
