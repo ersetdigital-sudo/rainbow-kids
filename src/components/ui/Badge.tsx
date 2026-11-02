@@ -17,6 +17,7 @@ const STATUS_CLASS: Record<string, string> = {
   Diarsipkan: "b-in",
   Tempo: "b-in",
   Tunai: "b-ac",
+  COD: "b-ac",
   Minus: "b-er",
 };
 

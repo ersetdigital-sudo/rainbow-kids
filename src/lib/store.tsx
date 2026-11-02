@@ -10,6 +10,7 @@ import {
 } from "react";
 import { TODAY, nowStamp } from "./date";
 import { uid } from "./format";
+import { monthCode, nextId } from "./ids";
 import {
   customerStatus,
   overdueSales,
@@ -33,6 +34,7 @@ import type {
   Biz,
   CostChange,
   Customer,
+  CustomerChange,
   DB,
   ModuleKey,
   OpnameLine,
@@ -42,6 +44,7 @@ import type {
   SaleItem,
   SaleRequest,
   SaleRevision,
+  SaleType,
   Supplier,
 } from "./types";
 
@@ -49,7 +52,8 @@ export type SaleDraft = {
   customer: string;
   customerId?: string;
   date: string;
-  type: "tunai" | "tempo";
+  /** Kosong = belum dipilih — transaksi tidak bisa diajukan. */
+  type: SaleType | "";
   due: string;
   items: { vid: string; qty: number; price: number }[];
   ship: number;
@@ -183,7 +187,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         approvals: [
           ...prev.approvals,
           {
-            id: `AP-${String(prev.approvals.length + 1).padStart(3, "0")}`,
+            id: nextId(prev.approvals.map((a) => a.id), "AP-"),
             kind: "customer" as const,
             type: "Toko baru",
             before: "—",
@@ -205,39 +209,76 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
-  /** Ubah data toko (nama, HP, alamat). Jenis & rekening lama dibiarkan. */
-  const updateCustomer = useCallback<StoreValue["updateCustomer"]>(
+  /**
+   * Ajukan perubahan data toko (nama, HP, alamat). Data lama tetap dipakai
+   * sampai Owner menyetujui pengajuan — pola yang sama dengan hapus toko.
+   */
+  const requestCustomerEdit = useCallback<StoreValue["requestCustomerEdit"]>(
     (id, patch) => {
       const name = patch.name.trim();
       if (!name) return { ok: false, msg: "Isi nama toko" };
       const current = getSnapshot();
-      if (!current.customers.some((c) => c.id === id))
-        return { ok: false, msg: "Toko tidak ditemukan" };
+      const customer = current.customers.find((c) => c.id === id);
+      if (!customer) return { ok: false, msg: "Toko tidak ditemukan" };
       if (
         current.customers.some(
           (c) => c.id !== id && c.name.toLowerCase() === name.toLowerCase(),
         )
       )
         return { ok: false, msg: "Toko dengan nama itu sudah ada" };
+      if (
+        current.approvals.some(
+          (a) =>
+            a.kind === "customerEdit" &&
+            a.customerId === id &&
+            a.status === "Menunggu",
+        )
+      )
+        return {
+          ok: false,
+          msg: "Perubahan toko ini masih menunggu approval Owner",
+        };
 
+      const phone = patch.phone?.trim() ?? "";
+      const address = patch.address?.trim() ?? "";
+      const changes: CustomerChange[] = [];
+      if (name !== customer.name)
+        changes.push({ field: "name", before: customer.name, after: name });
+      if (phone !== (customer.phone ?? ""))
+        changes.push({
+          field: "phone",
+          before: customer.phone ?? "",
+          after: phone,
+        });
+      if (address !== (customer.address ?? ""))
+        changes.push({
+          field: "address",
+          before: customer.address ?? "",
+          after: address,
+        });
+      if (!changes.length) return { ok: false, msg: "Tidak ada perubahan" };
+
+      const time = nowStamp();
       setSnapshot((prev) => ({
         ...prev,
-        customers: prev.customers.map((c) =>
-          c.id === id
-            ? {
-                ...c,
-                name,
-                phone: patch.phone?.trim() || undefined,
-                address: patch.address?.trim() || undefined,
-              }
-            : c,
-        ),
-        // Nama toko di invoice lama ikut diperbarui agar konsisten.
-        sales: prev.sales.map((s) =>
-          s.customerId === id ? { ...s, customer: name } : s,
-        ),
+        approvals: [
+          ...prev.approvals,
+          {
+            id: nextId(prev.approvals.map((a) => a.id), "AP-"),
+            kind: "customerEdit" as const,
+            type: "Ubah data toko",
+            before: customer.name,
+            after: name,
+            customerId: id,
+            customerName: customer.name,
+            customerChanges: changes,
+            user: prev.user,
+            time,
+            status: "Menunggu" as const,
+          },
+        ],
       }));
-      return { ok: true, msg: "Data toko diperbarui" };
+      return { ok: true, msg: "Pengajuan ubah data toko dikirim ke Owner" };
     },
     [],
   );
@@ -280,7 +321,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       approvals: [
         ...prev.approvals,
         {
-          id: `AP-${String(prev.approvals.length + 1).padStart(3, "0")}`,
+          id: nextId(prev.approvals.map((a) => a.id), "AP-"),
           kind: "customerDelete" as const,
           type: "Hapus toko",
           before: customerStatus(customer),
@@ -320,6 +361,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
    */
   const saveSale = useCallback((draft: SaleDraft): Result => {
     const current = getSnapshot();
+    if (!draft.type)
+      return { ok: false, msg: "Pilih jenis transaksi (COD atau Tempo)" };
     if (!draft.customer.trim())
       return { ok: false, msg: "Isi nama toko dulu" };
     if (!draft.items.length)
@@ -392,7 +435,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       approvals: [
         ...prev.approvals,
         {
-          id: `AP-${String(prev.approvals.length + 1).padStart(3, "0")}`,
+          id: nextId(prev.approvals.map((a) => a.id), "AP-"),
           kind: "invoice" as const,
           type: "Invoice penjualan baru",
           before: 0,
@@ -460,7 +503,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         approvals: [
           ...prev.approvals,
           {
-            id: `AP-${String(prev.approvals.length + 1).padStart(3, "0")}`,
+            id: nextId(prev.approvals.map((a) => a.id), "AP-"),
             kind: "sale" as const,
             type: "Harga & biaya invoice",
             saleId,
@@ -507,7 +550,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             ok: false,
             msg: "Sudah ada pengajuan pelunasan yang menunggu approval Owner",
           };
-        const approvalId = `AP-${String(current.approvals.length + 1).padStart(3, "0")}`;
+        const approvalId = nextId(
+          current.approvals.map((a) => a.id),
+          "AP-",
+        );
         setSnapshot((prev) => ({
           ...prev,
           sales: prev.sales.map((s) =>
@@ -598,7 +644,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         approvals: [
           ...prev.approvals,
           {
-            id: `AP-${String(prev.approvals.length + 1).padStart(3, "0")}`,
+            id: nextId(prev.approvals.map((a) => a.id), "AP-"),
             kind: "saleDelete" as const,
             type: "Hapus penjualan",
             saleId,
@@ -698,7 +744,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         approvals: [
           ...prev.approvals,
           ...list.map((c, idx) => ({
-            id: `AP-${String(prev.approvals.length + 1 + idx).padStart(3, "0")}`,
+            id: nextId(
+              prev.approvals.map((a) => a.id),
+              "AP-",
+              3,
+              idx,
+            ),
             kind: "variant" as const,
             type: c.type,
             vid,
@@ -761,7 +812,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         approvals: [
           ...prev.approvals,
           {
-            id: `AP-${String(prev.approvals.length + 1).padStart(3, "0")}`,
+            id: nextId(prev.approvals.map((a) => a.id), "AP-"),
             kind: "nota" as const,
             type: "Izin belanja nota",
             before: beforeTotal,
@@ -801,7 +852,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         approvals: [
           ...prev.approvals,
           {
-            id: `AP-${String(prev.approvals.length + 1).padStart(3, "0")}`,
+            id: nextId(prev.approvals.map((a) => a.id), "AP-"),
             kind: "purchase" as const,
             type: "Status pembayaran pembelian",
             purchaseId,
@@ -874,7 +925,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         approvals: [
           ...prev.approvals,
           {
-            id: `AP-${String(prev.approvals.length + 1).padStart(3, "0")}`,
+            id: nextId(prev.approvals.map((a) => a.id), "AP-"),
             kind: "notaEdit" as const,
             type: "Revisi nota belanja",
             purchaseId,
@@ -897,7 +948,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const startOpname = useCallback(() => {
     const current = getSnapshot();
-    const id = `SO-${String(current.opnames.length + 1).padStart(3, "0")}`;
+    const id = nextId(current.opnames.map((o) => o.id), "SO-");
     const lines: OpnameLine[] = current.products.flatMap((p) =>
       p.variants.map((v) => ({ vid: v.id, sys: v.stock, phys: "", note: "" })),
     );
@@ -1044,6 +1095,53 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
+      // Ubah data toko — baru diterapkan setelah disetujui Owner.
+      if (a.kind === "customerEdit") {
+        const changes = a.customerChanges ?? [];
+        const nextName = ok
+          ? changes.find((c) => c.field === "name")?.after
+          : undefined;
+        const nextPhone = ok
+          ? changes.find((c) => c.field === "phone")?.after
+          : undefined;
+        const nextAddress = ok
+          ? changes.find((c) => c.field === "address")?.after
+          : undefined;
+
+        return {
+          ...prev,
+          customers: prev.customers.map((c) =>
+            c.id === a.customerId && ok
+              ? {
+                  ...c,
+                  name: nextName ?? c.name,
+                  phone:
+                    nextPhone !== undefined
+                      ? nextPhone || undefined
+                      : c.phone,
+                  address:
+                    nextAddress !== undefined
+                      ? nextAddress || undefined
+                      : c.address,
+                }
+              : c,
+          ),
+          // Nama toko di invoice lama ikut diperbarui agar konsisten.
+          sales: nextName
+            ? prev.sales.map((s) =>
+                s.customerId === a.customerId
+                  ? { ...s, customer: nextName }
+                  : s,
+              )
+            : prev.sales,
+          approvals: prev.approvals.map((x) =>
+            x.id === id
+              ? { ...x, status: ok ? "Disetujui" : "Ditolak", by: prev.user, decidedAt }
+              : x,
+          ),
+        };
+      }
+
       // Hapus order penjualan — stok dikembalikan dan approval terkait ditolak.
       if (a.kind === "saleDelete") {
         const sale = prev.sales.find((s) => s.id === a.saleId);
@@ -1120,7 +1218,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             ),
           };
 
-        const saleId = `INV-2610-${String(prev.sales.length + 1).padStart(4, "0")}`;
+        // Nomor urut dari invoice terbesar + 1; kode bulan dari tanggal transaksi.
+        const saleId = nextId(
+          prev.sales.map((s) => s.id),
+          `INV-${monthCode(req.date)}-`,
+          4,
+        );
         const sale: Sale = {
           id: saleId,
           date: req.date,
@@ -1135,14 +1238,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           note: "",
           payments: [],
         };
-        if (sale.type === "tunai")
-          sale.payments.push({
-            date: sale.date,
-            amt: saleTotal(sale),
-            method: "Tunai",
-            status: "Disetujui",
-          });
-        else if (req.paid > 0)
+        // COD tidak lagi otomatis lunas: invoice berstatus Belum Lunas sampai
+        // ada pengajuan pelunasan yang disetujui Owner (sama seperti tempo).
+        if (sale.type === "tempo" && req.paid > 0)
           sale.payments.push({
             date: sale.date,
             amt: req.paid,
@@ -1272,7 +1370,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
               ),
             };
 
-          const purchaseId = `PB-${String(prev.purchases.length + 1).padStart(3, "0")}`;
+          const purchaseId = nextId(
+            prev.purchases.map((p) => p.id),
+            "PB-",
+          );
           const products = prev.products.map((p) => ({
             ...p,
             variants: p.variants.map((v) => {
@@ -1582,7 +1683,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       resetDemo,
       updateBiz,
       addCustomer,
-      updateCustomer,
+      requestCustomerEdit,
       requestCustomerDelete,
       addSupplier,
       saveSale,
@@ -1611,7 +1712,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       resetDemo,
       updateBiz,
       addCustomer,
-      updateCustomer,
+      requestCustomerEdit,
       requestCustomerDelete,
       addSupplier,
       saveSale,
@@ -1661,7 +1762,7 @@ type StoreValue = {
     phone?: string;
     address?: string;
   }) => Result;
-  updateCustomer: (
+  requestCustomerEdit: (
     id: string,
     patch: {
       name: string;

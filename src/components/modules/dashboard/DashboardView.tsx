@@ -415,7 +415,7 @@ export function DashboardView() {
                       </td>
                       <td data-label="Jenis">
                         <Badge tone={s.type === "tempo" ? "b-in" : "b-ac"}>
-                          {s.type === "tempo" ? "Tempo" : "Tunai"}
+                          {s.type === "tempo" ? "Tempo" : "COD"}
                         </Badge>
                       </td>
                       <td data-label="Total" className="r num">

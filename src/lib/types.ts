@@ -128,8 +128,16 @@ export type ApprovalKind =
   | "notaEdit"
   | "invoice"
   | "customer"
+  | "customerEdit"
   | "customerDelete"
   | "saleDelete";
+
+/** Satu field data toko yang diusulkan berubah lewat approval. */
+export type CustomerChange = {
+  field: "name" | "phone" | "address";
+  before: string;
+  after: string;
+};
 
 /** Ringkasan tunggakan toko saat invoice diajukan. */
 export type SaleOverdueSummary = {
@@ -192,9 +200,11 @@ export type Approval = {
   after: string | number;
   saleId?: string;
   purchaseId?: string;
-  /** Toko terkait approval kind "customer" / "customerDelete". */
+  /** Toko terkait approval kind "customer" / "customerEdit" / "customerDelete". */
   customerId?: string;
   customerName?: string;
+  /** Perbandingan sebelum & sesudah untuk kind "customerEdit". */
+  customerChanges?: CustomerChange[];
   /** Alasan pengajuan hapus toko / order. */
   reason?: string;
   /** Snapshot penjualan saat pengajuan hapus order. */
@@ -280,6 +290,7 @@ export type DB = {
 
 export type ArStatus =
   | "Lunas"
+  | "Belum Lunas"
   | "Terlambat"
   | "Jatuh tempo"
   | "Belum jatuh tempo"

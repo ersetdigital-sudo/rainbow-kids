@@ -1,9 +1,19 @@
+/** Tanggal hari ini di zona waktu toko (Asia/Jakarta), format "YYYY-MM-DD". */
+export function todayJakarta(date = new Date()): string {
+  // en-CA selalu memformat tanggal sebagai YYYY-MM-DD.
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
 /**
- * Tanggal acuan demo. Di HTML asli nilainya hardcode ('2026-10-20')
- * supaya data simulasi selalu konsisten. Ubah di sini bila perlu
- * memakai tanggal hari ini (date-hidup).
+ * Tanggal acuan aplikasi: hari ini yang asli (Asia/Jakarta).
+ * Dipakai untuk default form, hitungan jatuh tempo, histori, dan laporan.
  */
-export const TODAY = "2026-10-20";
+export const TODAY = todayJakarta();
 
 /** Waktu lokal saat ini dalam format "YYYY-MM-DD HH:mm". */
 export function nowStamp(date = new Date()): string {

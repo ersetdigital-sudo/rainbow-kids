@@ -32,6 +32,21 @@ export function CustomersView() {
     [db.approvals],
   );
 
+  /** Toko yang perubahan datanya masih menunggu approval Owner. */
+  const pendingEditIds = useMemo(
+    () =>
+      new Set(
+        db.approvals.flatMap((a) =>
+          a.kind === "customerEdit" &&
+          a.status === "Menunggu" &&
+          a.customerId
+            ? [a.customerId]
+            : [],
+        ),
+      ),
+    [db.approvals],
+  );
+
   const deleteTarget = deleteId
     ? db.customers.find((c) => c.id === deleteId) ?? null
     : null;
@@ -67,6 +82,9 @@ export function CustomersView() {
               {status === "Diarsipkan" && (
                 <span className="bd b-in">Diarsipkan</span>
               )}
+              {pendingEditIds.has(c.id) && (
+                <span className="bd b-wa">Menunggu persetujuan edit</span>
+              )}
               {pendingDeleteIds.has(c.id) && (
                 <span className="bd b-er">Menunggu hapus</span>
               )}
@@ -92,6 +110,7 @@ export function CustomersView() {
           <button
             type="button"
             className="btn s"
+            disabled={pendingEditIds.has(c.id)}
             onClick={(e) => {
               e.stopPropagation();
               setEditId(c.id);

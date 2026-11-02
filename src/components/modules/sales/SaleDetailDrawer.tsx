@@ -93,7 +93,7 @@ export function SaleDetailDrawer({
   );
   const creator = invoiceApproval?.user ?? db.user ?? "—";
   const pcs = sale.items.reduce((a, i) => a + i.qty, 0);
-  const typeLabel = sale.type === "tempo" ? "Tempo" : "Tunai";
+  const typeLabel = sale.type === "tempo" ? "Tempo" : "COD";
 
   /** Hitung mundur jatuh tempo, relatif ke tanggal acuan aplikasi. */
   const dueNote = (() => {

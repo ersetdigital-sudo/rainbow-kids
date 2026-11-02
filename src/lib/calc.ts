@@ -41,9 +41,9 @@ export function arStatus(s: Sale, today = TODAY): ArStatus {
   const rem = saleTotal(s) - salePaid(s);
   if (rem <= 0) return "Lunas";
   if (saleProposed(s) >= rem) return "Menunggu Pelunasan";
-  // Tanpa jatuh tempo (tunai) tapi masih ada sisa — mis. harga diubah lewat
-  // approval setelah pembayaran tunai tercatat.
-  if (!s.due) return "Belum jatuh tempo";
+  // COD tidak punya jatuh tempo: sisa tagihan tetap "Belum Lunas" dan
+  // tidak pernah dihitung telat / jatuh tempo.
+  if (!s.due) return "Belum Lunas";
   if (s.due < today) return "Terlambat";
   if (s.due <= addDays(today, 3)) return "Jatuh tempo";
   return "Belum jatuh tempo";
@@ -100,7 +100,8 @@ export function saleRequestPosition(
   today = TODAY,
 ): PaymentPosition {
   const total = req.items.reduce((a, i) => a + i.qty * i.price, 0);
-  const paid = req.type === "tunai" ? total : +req.paid || 0;
+  // COD tidak lagi otomatis lunas — baru lunas lewat pelunasan yang disetujui.
+  const paid = +req.paid || 0;
   if (total - paid <= 0) return "Lunas";
   if (req.due && req.due > today) return "Belum Jatuh Tempo";
   return "Belum Lunas";
