@@ -165,7 +165,7 @@ export function UsersView() {
           Matriks hak akses per role
         </div>
         <div className="px-5 pb-3 text-xs" style={{ color: "var(--mu)" }}>
-          Klik label untuk mengganti level akses (simulasi).
+          Klik label untuk mengganti level akses — langsung tersimpan untuk semua pengguna dengan role itu.
         </div>
         <div className="tw">
           <table className="t pm">
