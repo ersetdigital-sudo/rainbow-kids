@@ -1,6 +1,4 @@
 import { createClient } from "@supabase/supabase-js";
-import { emptyDb } from "@/lib/workspace";
-import type { AppUser, DB } from "@/lib/types";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -14,8 +12,8 @@ function adminClient() {
 }
 
 /**
- * Status project: apakah masih belum punya akun, dan apakah tabel
- * `app_state` sudah dibuat lewat supabase/schema.sql.
+ * Status project: apakah masih belum punya akun, dan apakah tabel-tabel data
+ * toko sudah dibuat lewat supabase/schema.sql.
  */
 export async function GET() {
   const admin = adminClient();
@@ -26,7 +24,7 @@ export async function GET() {
     perPage: 1,
   });
   const { error: tableError } = await admin
-    .from("app_state")
+    .from("store_settings")
     .select("id")
     .limit(1);
 
@@ -90,26 +88,7 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, msg: error.message }, { status: 400 });
   }
 
-  // Catat Owner di data toko supaya langsung muncul di menu Pengguna.
-  const { data: row } = await admin
-    .from("app_state")
-    .select("data")
-    .eq("id", 1)
-    .maybeSingle();
-  const saved = row?.data as DB | undefined;
-  const base = saved && Array.isArray(saved.products) ? saved : emptyDb();
-  const owner: AppUser = { name, email, role: "Owner", active: true };
-  const users = base.users.some((u) => u.email.toLowerCase() === email)
-    ? base.users
-    : [...base.users, owner];
-
-  await admin
-    .from("app_state")
-    .upsert({
-      id: 1,
-      data: { ...base, users, user: `${name} (Owner)` },
-      updated_at: new Date().toISOString(),
-    });
-
+  // Akun Supabase Auth sudah menjadi sumber daftar pengguna — tidak ada
+  // salinan terpisah yang perlu ditulis di sini.
   return Response.json({ ok: true });
 }

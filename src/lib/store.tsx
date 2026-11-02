@@ -144,7 +144,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     Promise.all([fetchRemoteState(), fetchAccounts()]).then(
       ([res, accounts]) => {
-        // Gagal baca (mis. tabel app_state belum dibuat): biarkan data lokal.
+        // Gagal baca (mis. supabase/schema.sql belum dijalankan): pakai data lokal.
         if (cancelled || !res.ok) return;
 
         const email = (session.user.email ?? "").trim();
@@ -193,7 +193,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Data asli tidak boleh hilang diam-diam: beri tahu bila penyimpanan ke
-  // Supabase gagal (mis. tabel app_state belum dibuat).
+  // Simpan ke Supabase gagal (mis. supabase/schema.sql belum dijalankan).
   useEffect(() => {
     const seen = new Set<string>();
     setRemoteErrorHandler((msg) => {

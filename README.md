@@ -13,6 +13,12 @@ form yang jadi bottom sheet di layar kecil.
 ## Menyambung Supabase
 
 1. Jalankan `supabase/schema.sql` di project Supabase: **Dashboard → SQL Editor → New query → Run**.
+   Skrip ini membuat tabel relasional: `products` + `product_variants`, `customers`,
+   `suppliers`, `sales` + `sale_items` + `sale_payments`, `purchases` + `purchase_items`,
+   `opnames` + `opname_lines`, `approvals`, `stock_history`, `expenses`,
+   `store_settings`, `role_permissions` — beserta policy RLS-nya. Aman dijalankan ulang.
+   Kalau dulu sempat jalan versi lama (satu tabel `app_state`), isinya diimpor otomatis
+   sekali saat aplikasi dibuka, lalu tabel `app_state` boleh dihapus.
 2. Isi tiga kredensial lewat halaman Secrets aplikasi (jangan tulis di file):
    - `NEXT_PUBLIC_SUPABASE_URL` — *Project Settings → API → Project URL*
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — *Project Settings → API → anon public*
@@ -55,6 +61,18 @@ src/
 │   ├── calc.ts             # helper laba/piutang
 │   ├── date.ts format.ts   # util tanggal & rupiah
 │   ├── persist.ts          # external store (localStorage) untuk useSyncExternalStore
+│   ├── remote.ts           # baca/tulis state ke Supabase (debounce + antrian)
+│   ├── db/                 # lapisan data: satu modul per domain
+│   │   ├── client.ts       # helper query + diff baris
+│   │   ├── products.ts     # produk & varian
+│   │   ├── partners.ts     # pelanggan & supplier
+│   │   ├── sales.ts        # penjualan, barang, pembayaran
+│   │   ├── purchases.ts    # pembelian supplier
+│   │   ├── opnames.ts      # stok opname
+│   │   ├── approvals.ts    # approval & audit
+│   │   ├── settings.ts     # identitas toko + hak akses role
+│   │   ├── logs.ts         # histori stok & biaya
+│   │   └── index.ts        # loadStore() / saveStore()
 │   ├── store.tsx           # context + seluruh action (create context, apply di store)
 │   └── nav.ts              # konfigurasi menu + ikon
 legacy/                     # HTML & CSS asli (referensi, tidak dipakai runtime)
@@ -62,16 +80,22 @@ legacy/                     # HTML & CSS asli (referensi, tidak dipakai runtime)
 
 ## Data aplikasi
 
-Tidak ada data toko di dalam kode: seluruh data (identitas toko, produk, pelanggan,
-transaksi, stok opname, approval, hak akses) tersimpan di Supabase — satu baris
-jsonb `public.app_state` (`supabase/schema.sql`). Daftar pengguna dan role-nya
-adalah akun Supabase Auth yang sebenarnya (`GET/POST/PATCH /api/users`).
+Tidak ada data toko di dalam kode: seluruh data tersimpan di Supabase dalam tabel
+terpisah (`supabase/schema.sql`), satu modul kode per domain di `src/lib/db/`.
+Daftar pengguna dan role-nya adalah akun Supabase Auth yang sebenarnya
+(`GET/POST/PATCH /api/users`).
 
 | Item | Diisi dari | Tersimpan di |
 | --- | --- | --- |
-| Identitas toko (nama, alamat, HP, email, NPWP, rekening) | Pengaturan Toko | `app_state` (`biz`) |
+| Identitas toko (nama, alamat, HP, email, NPWP, rekening) | Pengaturan Toko | `store_settings` |
+| Hak akses per role | Pengguna & Akses | `role_permissions` |
 | Pengguna, role, status aktif | Pengguna & Hak Akses | Supabase Auth (`user_metadata.role`, ban = nonaktif) |
-| Produk, pelanggan, supplier, transaksi, opname, approval | menu masing-masing | `app_state` |
+| Produk & stok varian | Produk & Stok | `products`, `product_variants` |
+| Pelanggan / supplier | menu masing-masing | `customers`, `suppliers` |
+| Penjualan / piutang | Penjualan | `sales`, `sale_items`, `sale_payments` |
+| Pembelian supplier | Pembelian | `purchases`, `purchase_items` |
+| Stok opname | Stok Opname | `opnames`, `opname_lines` |
+| Approval, histori stok, biaya | Approval & Laporan | `approvals`, `stock_history`, `expenses` |
 
 Sisa nilai branding yang masih di kode hanya teks identitas aplikasi (judul
 halaman/metadata SEO `Rainbow Kids`), bukan data toko.
