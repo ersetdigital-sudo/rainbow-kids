@@ -16,3 +16,4 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **Preview origin:** `next.config.ts` appends `3000-$BASE44_PUBLIC_HOST_SUFFIX` to `allowedDevOrigins` only when `BASE44_PREVIEW_MODE === "1"`, so the proxy origin can fetch dev assets/HMR. Unset/other values keep the original config.
 - **Verify:** `curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/` returns 200, and the container logs show live Turbopack compilation (dev source, not a prebuilt bundle).
 - **Lint:** `docker compose -f docker-compose.base44.yml exec -T web npm run lint`.
+- **Stale CSS cache:** the repo ships a `.next` cache from import time. If rules from newer parts of `src/app/globals.css` silently never load (e.g. the bell panel `.act-*` opens unstyled and lands at the end of the document), it is not a code bug: stop `web`, `rm -rf .next`, then `up -d web` to force a clean Tailwind/Turbopack compile.
