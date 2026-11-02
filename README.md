@@ -7,7 +7,18 @@ Identitas visual dipertahankan: **Honey Gold × Deep Navy** (`#04123F` navy, `#F
 font Plus Jakarta Sans, sidebar gelap, tabel yang berubah jadi kartu di mobile, dan drawer
 form yang jadi bottom sheet di layar kecil.
 
-> ⚠️ Masih **prototipe**: seluruh data disimpan di `localStorage` browser (tidak ada backend).
+> ⚠️ Tanpa kredensial Supabase, seluruh data disimpan di `localStorage` browser (mode lokal, tanpa login).
+> Dengan kredensial Supabase, data toko disimpan di database dan setiap pengguna masuk dengan email + password.
+
+## Menyambung Supabase
+
+1. Jalankan `supabase/schema.sql` di project Supabase: **Dashboard → SQL Editor → New query → Run**.
+2. Isi tiga kredensial lewat halaman Secrets aplikasi (jangan tulis di file):
+   - `NEXT_PUBLIC_SUPABASE_URL` — *Project Settings → API → Project URL*
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — *Project Settings → API → anon public*
+   - `SUPABASE_SERVICE_ROLE_KEY` — *Project Settings → API → service_role* (hanya dipakai server untuk membuat akun)
+3. Buka aplikasi: layar masuk muncul. Karena belum ada akun, isi **Buat akun Owner** (nama, email, password).
+4. Pengguna lain ditambahkan dari menu **Pengguna &amp; Akses → Tambah pengguna** (lengkap dengan password).
 
 ## Menjalankan
 

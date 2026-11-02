@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/layout/AppShell";
+import { AuthProvider } from "@/lib/auth";
 import { StoreProvider } from "@/lib/store";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -61,9 +62,11 @@ export default function RootLayout({
   return (
     <html lang="id" className={jakarta.variable}>
       <body>
-        <StoreProvider>
-          <AppShell>{children}</AppShell>
-        </StoreProvider>
+        <AuthProvider>
+          <StoreProvider>
+            <AppShell>{children}</AppShell>
+          </StoreProvider>
+        </AuthProvider>
       </body>
     </html>
   );

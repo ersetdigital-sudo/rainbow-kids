@@ -1,3 +1,4 @@
+import { queueRemoteSave } from "./remote";
 import { DEFAULT_PERMS, emptyDb, seed } from "./seed";
 import type { DB, Role } from "./types";
 
@@ -96,6 +97,8 @@ function persist(value: DB) {
     } catch {
       /* storage penuh / diblokir — data tetap jalan di memory */
     }
+    // localStorage jadi cache; sumber data bersama ada di Supabase (bila aktif).
+    queueRemoteSave(value);
   }
   listeners.forEach((l) => l());
 }

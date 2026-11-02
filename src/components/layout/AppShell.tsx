@@ -3,6 +3,8 @@
 import { motion } from "motion/react";
 import { usePathname } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import { LoginScreen } from "@/components/auth/LoginScreen";
+import { useAuth } from "@/lib/auth";
 import { BottomNav } from "./BottomNav";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
@@ -32,6 +34,7 @@ function SidebarFallback() {
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const { configured, ready, session } = useAuth();
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
@@ -45,6 +48,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (window.matchMedia("(max-width: 899px)").matches) setOpen(true);
     else setCollapsed((c) => !c);
   };
+
+  // Supabase aktif: layar masuk menutup seluruh aplikasi sampai sesi ada.
+  // Segmen halaman tetap ter-mount supaya navigasi tetap tervalidasi.
+  const gate = configured && (!ready || !session);
 
   return (
     <>
@@ -66,6 +73,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Suspense fallback={null}>
         <BottomNav onMenu={() => setOpen(true)} />
       </Suspense>
+
+      {gate && (
+        <div className="fixed inset-0 z-[95] overflow-y-auto">
+          {ready ? (
+            <LoginScreen />
+          ) : (
+            <div
+              className="min-h-screen grid place-items-center text-sm"
+              style={{ color: "var(--mu)" }}
+            >
+              Memuat…
+            </div>
+          )}
+        </div>
+      )}
     </>
   );
 }

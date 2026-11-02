@@ -9,7 +9,9 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { useAuth } from "./auth";
 import { TODAY, nowStamp } from "./date";
+import { fetchRemoteState } from "./remote";
 import { uid } from "./format";
 import { monthCode, nextId } from "./ids";
 import {
@@ -122,6 +124,7 @@ const StoreContext = createContext<StoreValue | null>(null);
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const db = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const { configured, ready, session } = useAuth();
   const [toasts, setToasts] = useState<{ id: number; msg: string }[]>([]);
 
   // Data tersimpan di browser baru dipakai setelah hydration selesai, supaya
@@ -130,6 +133,26 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const timer = window.setTimeout(activateBrowserSnapshot, 0);
     return () => window.clearTimeout(timer);
   }, []);
+
+  // Supabase aktif: setelah masuk, pakai data toko bersama dari server.
+  useEffect(() => {
+    if (!configured || !ready || !session) return;
+    let cancelled = false;
+    fetchRemoteState().then((remote) => {
+      if (cancelled || !remote) return;
+      const email = session.user.email ?? "";
+      const me = remote.users.find(
+        (u) => u.email.toLowerCase() === email.toLowerCase(),
+      );
+      setSnapshot({
+        ...remote,
+        user: me ? `${me.name} (${me.role})` : email,
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [configured, ready, session]);
 
   const toast = useCallback((msg: string) => {
     const id = Date.now() + Math.random();
