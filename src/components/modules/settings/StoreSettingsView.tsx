@@ -8,6 +8,7 @@ import { useStore } from "@/lib/store";
 import { PageHead } from "@/components/ui/PageHead";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { downloadJson, stamp } from "@/lib/export";
+import { prefsSupported } from "@/lib/db/settings";
 import type { Biz, DB, Prefs } from "@/lib/types";
 
 /** Batas ukuran logo: disimpan sebagai data URL di baris pengaturan Supabase. */
@@ -80,7 +81,17 @@ export function StoreSettingsView() {
         .map((m) => m.trim())
         .filter(Boolean),
     });
-    toast(prefs.ok ? "Pengaturan toko disimpan" : prefs.msg);
+    if (!prefs.ok) {
+      toast(prefs.msg);
+      return;
+    }
+    // Di database lama kolom logo/tempo/ambang stok/metode bayar belum ada,
+    // jadi beri tahu apa yang benar-benar tersimpan.
+    toast(
+      prefsSupported()
+        ? "Pengaturan toko disimpan"
+        : "Identitas toko disimpan. Logo, tempo, ambang stok & metode bayar butuh supabase/migration-002-settings.sql",
+    );
   };
 
   const pickLogo = (file: File | undefined) => {

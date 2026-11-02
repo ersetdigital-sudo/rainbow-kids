@@ -27,6 +27,17 @@ export type Settings = SettingsData & { initialized: boolean };
 
 const SETTINGS_ID = 1;
 
+/**
+ * Apakah kolom pengaturan tambahan (migrasi 002) sudah ada di database?
+ * Database lama belum punya kolomnya, sehingga pengaturan tersebut tidak bisa
+ * disimpan — UI memakai tanda ini untuk memberi tahu pengguna.
+ */
+let prefsColumns = true;
+
+export function prefsSupported(): boolean {
+  return prefsColumns;
+}
+
 /** Pemisah daftar metode pembayaran di satu kolom teks. */
 const METHOD_SEP = "|";
 
@@ -56,6 +67,7 @@ export async function loadSettings(): Promise<Settings> {
   ]);
 
   const row = rows[0];
+  if (row) prefsColumns = row.logo !== undefined && row.due_days !== undefined;
   const biz: Biz = {
     name: row?.name ?? "",
     addr: row?.addr ?? "",
@@ -130,6 +142,7 @@ async function writeRow(row: SettingsRow): Promise<void> {
       npwp: row.npwp,
       bank: row.bank,
     };
+    prefsColumns = false;
     await upsertRows("store_settings", [base] as unknown as Row[]);
     console.warn(
       "store_settings: kolom logo/note/due_days/min_stock/pay_methods belum ada — jalankan supabase/migration-002-settings.sql",
