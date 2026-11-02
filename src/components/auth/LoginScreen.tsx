@@ -1,11 +1,13 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 
 /** Layar masuk saat Supabase aktif. */
 export function LoginScreen() {
   const { signIn } = useAuth();
+  const router = useRouter();
   const [needsOwner, setNeedsOwner] = useState(false);
   const [tableReady, setTableReady] = useState(true);
   const [name, setName] = useState("");
@@ -58,7 +60,12 @@ export function LoginScreen() {
     if (!result.ok) {
       setError(result.msg);
       setPassword("");
+      return;
     }
+
+    // Sesi aktif: StoreProvider membaca data toko, AppShell menahan dashboard
+    // sampai siap, lalu halaman dashboard yang ditampilkan.
+    router.replace("/");
   };
 
   return (

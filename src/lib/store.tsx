@@ -129,6 +129,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const db = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const { configured, ready, session } = useAuth();
   const [toasts, setToasts] = useState<{ id: number; msg: string }[]>([]);
+  // Akun yang datanya sudah selesai dibaca dari Supabase. Selama belum sama
+  // dengan sesi aktif, UI menunggu supaya dashboard tidak tampil kosong dulu.
+  const [loadedUser, setLoadedUser] = useState<string | null>(null);
 
   // Data tersimpan di browser baru dipakai setelah hydration selesai, supaya
   // markup server & client sama dan tidak memicu hydration mismatch.
@@ -177,11 +180,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           };
         });
       },
-    );
+    ).finally(() => {
+      // Data toko siap (atau gagal dibaca → tetap pakai data lokal).
+      if (!cancelled) setLoadedUser(session.user.id);
+    });
     return () => {
       cancelled = true;
     };
   }, [configured, ready, session]);
+
+  /** Dashboard baru boleh tampil setelah data toko akun ini selesai dimuat. */
+  const storeReady =
+    !configured || !session || loadedUser === session.user.id;
 
   const toast = useCallback((msg: string) => {
     const id = Date.now() + Math.random();
@@ -1831,6 +1841,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<StoreValue>(
     () => ({
       db,
+      storeReady,
       toast,
       clearData,
       updateBiz,
@@ -1860,6 +1871,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }),
     [
       db,
+      storeReady,
       toast,
       clearData,
       updateBiz,
@@ -1906,6 +1918,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
 type StoreValue = {
   db: DB;
+  /** False selama data toko dari Supabase belum selesai dimuat. */
+  storeReady: boolean;
   toast: (msg: string) => void;
   clearData: () => void;
   updateBiz: (patch: Biz) => Result;

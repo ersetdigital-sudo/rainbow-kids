@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { LoginScreen } from "@/components/auth/LoginScreen";
 import { useAuth } from "@/lib/auth";
+import { useStore } from "@/lib/store";
 import { BottomNav } from "./BottomNav";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
@@ -35,6 +36,7 @@ function SidebarFallback() {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { configured, ready, session } = useAuth();
+  const { storeReady } = useStore();
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
@@ -52,6 +54,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Supabase aktif: layar masuk menutup seluruh aplikasi sampai sesi ada.
   // Segmen halaman tetap ter-mount supaya navigasi tetap tervalidasi.
   const gate = configured && (!ready || !session);
+  // Sudah masuk tetapi data toko belum selesai dibaca: tahan dashboard dulu
+  // supaya tidak sempat tampil kosong sebelum datanya siap.
+  const loadingStore = !gate && !storeReady;
 
   return (
     <>
@@ -74,16 +79,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <BottomNav onMenu={() => setOpen(true)} />
       </Suspense>
 
-      {gate && (
+      {(gate || loadingStore) && (
         <div className="fixed inset-0 z-[95] overflow-y-auto">
-          {ready ? (
+          {gate && ready ? (
             <LoginScreen />
           ) : (
             <div
               className="min-h-screen grid place-items-center text-sm"
-              style={{ color: "var(--mu)" }}
+              style={{ background: "#F5F7FB", color: "var(--mu)" }}
             >
-              Memuat…
+              {loadingStore ? "Menyiapkan data toko…" : "Memuat…"}
             </div>
           )}
         </div>
