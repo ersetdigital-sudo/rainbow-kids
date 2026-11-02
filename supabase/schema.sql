@@ -1,9 +1,16 @@
--- Skema relasional aplikasi toko (Rainbow Kids).
--- Jalankan sekali di Supabase Dashboard → SQL Editor → New query → Run.
--- Aman dijalankan ulang: semua perintah memakai `if not exists`.
+-- ===========================================================================
+-- SKEMA DATABASE TOKO RAINBOW KIDS
+--
+-- Cara pakai: buka Supabase Dashboard -> SQL Editor -> New query,
+-- tempel seluruh isi file ini, lalu klik "Run" (sekali saja).
+--
+-- File ini aman dijalankan ulang: semua perintah memakai "if not exists"
+-- dan policy selalu dihapus lalu dibuat lagi.
+-- Tidak ada data contoh di dalamnya — toko mulai kosong.
+-- ===========================================================================
 
 -- ---------------------------------------------------------------------------
--- Pengaturan toko & hak akses
+-- 1. Pengaturan toko & hak akses (role × modul)
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.store_settings (
@@ -24,7 +31,7 @@ create table if not exists public.role_permissions (
 );
 
 -- ---------------------------------------------------------------------------
--- Produk & stok
+-- 2. Produk & stok
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.products (
@@ -44,14 +51,15 @@ create table if not exists public.product_variants (
   stock numeric not null default 0,
   cost numeric not null default 0,
   price numeric not null default 0,
-  position integer not null default 0
+  position integer not null default 0,
+  created_at timestamptz not null default now()
 );
 
 create index if not exists product_variants_product_idx
   on public.product_variants (product_id);
 
 -- ---------------------------------------------------------------------------
--- Toko pelanggan & supplier
+-- 3. Toko pelanggan & supplier
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.customers (
@@ -76,7 +84,7 @@ create table if not exists public.suppliers (
 );
 
 -- ---------------------------------------------------------------------------
--- Penjualan
+-- 4. Penjualan (invoice + barang + pembayaran)
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.sales (
@@ -119,7 +127,7 @@ create table if not exists public.sale_payments (
 );
 
 -- ---------------------------------------------------------------------------
--- Pembelian supplier
+-- 5. Pembelian / nota supplier
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.purchases (
@@ -141,8 +149,10 @@ create table if not exists public.purchase_items (
   primary key (purchase_id, position)
 );
 
+create index if not exists purchases_date_idx on public.purchases (date);
+
 -- ---------------------------------------------------------------------------
--- Stok opname
+-- 6. Stok opname (hitung fisik vs stok sistem)
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.opnames (
@@ -167,8 +177,10 @@ create table if not exists public.opname_lines (
   primary key (opname_id, position)
 );
 
+create index if not exists opnames_date_idx on public.opnames (date);
+
 -- ---------------------------------------------------------------------------
--- Approval & audit
+-- 7. Approval & audit
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.approvals (
@@ -208,6 +220,8 @@ create table if not exists public.stock_history (
   user_name text
 );
 
+create index if not exists stock_history_vid_idx on public.stock_history (vid);
+
 create table if not exists public.expenses (
   id bigint generated always as identity primary key,
   date date,
@@ -216,7 +230,9 @@ create table if not exists public.expenses (
 );
 
 -- ---------------------------------------------------------------------------
--- Hak akses tabel: satu toko, semua pengguna yang sudah login boleh baca/tulis.
+-- 8. Hak akses tabel
+-- Satu toko dipakai bersama, jadi setiap pengguna yang sudah login
+-- (role "authenticated") boleh baca & tulis. Tamu (anon) tidak dapat apa pun.
 -- ---------------------------------------------------------------------------
 
 do $$
@@ -240,6 +256,28 @@ begin
   end loop;
 end $$;
 
--- Catatan: tabel lama `public.app_state` (satu baris jsonb) tidak dipakai lagi.
--- Isinya diimpor otomatis ke tabel-tabel di atas saat aplikasi pertama dibuka,
--- lalu tabel itu boleh dihapus manual: `drop table public.app_state;`
+-- Hak akses SQL untuk role bawaan Supabase (aman bila role tidak ada).
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    execute 'grant usage on schema public to authenticated';
+    execute 'grant select, insert, update, delete on all tables in schema public to authenticated';
+    execute 'grant usage, select on all sequences in schema public to authenticated';
+  end if;
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- 9. Cek hasil: harus muncul 16 tabel di bawah ini.
+-- ---------------------------------------------------------------------------
+
+select table_name
+from information_schema.tables
+where table_schema = 'public' and table_type = 'BASE TABLE'
+order by table_name;
+
+-- Catatan:
+-- * Tabel lama `public.app_state` (satu baris jsonb) tidak dipakai lagi.
+--   Isinya diimpor otomatis ke tabel di atas saat aplikasi pertama dibuka,
+--   setelah itu boleh dihapus: `drop table public.app_state;`
+-- * Akun pengguna tidak disimpan di tabel sini — memakai Supabase Auth
+--   (Authentication -> Users), jadi tidak perlu tabel users/profiles.
