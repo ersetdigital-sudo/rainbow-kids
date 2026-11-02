@@ -4,7 +4,7 @@ import { StoreSettingsView } from "@/components/modules/settings/StoreSettingsVi
 export const metadata: Metadata = {
   title: "Pengaturan Toko",
   description:
-    "Atur nama, alamat, kontak, NPWP (opsional), dan rekening utama Rainbow Kids yang tercetak di kepala invoice.",
+    "Atur nama, alamat, kontak, NPWP (opsional), rekening utama, logo, dan catatan invoice yang tercetak di dokumen toko.",
   alternates: { canonical: "/settings" },
 };
 

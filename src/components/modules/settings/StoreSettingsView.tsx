@@ -1,48 +1,132 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- logo invoice dari Pengaturan Toko berupa data URL */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 import { PageHead } from "@/components/ui/PageHead";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import type { Biz } from "@/lib/types";
+import { downloadJson, stamp } from "@/lib/export";
+import type { Biz, DB, Prefs } from "@/lib/types";
 
-/** Kelola identitas toko yang tercetak di kepala invoice. */
+/** Batas ukuran logo: disimpan sebagai data URL di baris pengaturan Supabase. */
+const MAX_LOGO_BYTES = 200 * 1024;
+
+/** Huruf awal nama toko untuk kotak logo saat belum ada gambar. */
+function initials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return "TS";
+  return words
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+}
+
+/** Kelola identitas toko & pengaturan operasional yang dipakai seluruh aplikasi. */
 export function StoreSettingsView() {
-  const { db, updateBiz, clearData, toast } = useStore();
+  const { db, updateBiz, updatePrefs, restoreData, clearData, toast } =
+    useStore();
   const { configured } = useAuth();
-  const [form, setForm] = useState<Biz>(db.biz);
+  const [bizForm, setBizForm] = useState<Biz>(db.biz);
+  const [prefsForm, setPrefsForm] = useState<Prefs>(db.prefs);
+  /** Metode pembayaran ditulis sebagai satu baris dipisah koma. */
+  const [methods, setMethods] = useState(db.prefs.methods.join(", "));
+  const [confirm, setConfirm] = useState<"clear" | "restore" | null>(null);
+  const [pending, setPending] = useState<DB | null>(null);
+  const logoRef = useRef<HTMLInputElement>(null);
 
   // Ikuti data toko terbaru setelah dikosongkan atau dimuat ulang.
-  const [confirm, setConfirm] = useState<"clear" | null>(null);
-  const [lastBiz, setLastBiz] = useState(db.biz);
-  if (db.biz !== lastBiz) {
-    setLastBiz(db.biz);
-    setForm(db.biz);
+  const [lastDb, setLastDb] = useState({ biz: db.biz, prefs: db.prefs });
+  if (db.biz !== lastDb.biz || db.prefs !== lastDb.prefs) {
+    setLastDb({ biz: db.biz, prefs: db.prefs });
+    setBizForm(db.biz);
+    setPrefsForm(db.prefs);
+    setMethods(db.prefs.methods.join(", "));
   }
 
   const field = (key: keyof Biz) => ({
     "aria-label": key,
-    value: form[key],
+    value: bizForm[key],
     onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
-      setForm((f) => ({ ...f, [key]: e.target.value })),
+      setBizForm((f) => ({ ...f, [key]: e.target.value })),
   });
 
-  const dirty = (Object.keys(db.biz) as (keyof Biz)[]).some(
-    (k) => form[k] !== db.biz[k],
+  const bizDirty = (Object.keys(db.biz) as (keyof Biz)[]).some(
+    (k) => bizForm[k] !== db.biz[k],
   );
+  const prefsDirty =
+    prefsForm.dueDays !== db.prefs.dueDays ||
+    methods !== db.prefs.methods.join(", ") ||
+    prefsForm.note !== db.prefs.note ||
+    prefsForm.minStock !== db.prefs.minStock ||
+    prefsForm.logo !== db.prefs.logo;
 
   const save = () => {
-    const res = updateBiz(form);
-    toast(res.msg);
+    // Identitas toko baru divalidasi bila memang diubah, supaya pengaturan
+    // operasional (logo/tempo/ambang stok/metode bayar) bisa disimpan lebih dulu.
+    if (bizDirty) {
+      const biz = updateBiz(bizForm);
+      if (!biz.ok) {
+        toast(biz.msg);
+        return;
+      }
+    }
+    const prefs = updatePrefs({
+      ...prefsForm,
+      methods: methods
+        .split(",")
+        .map((m) => m.trim())
+        .filter(Boolean),
+    });
+    toast(prefs.ok ? "Pengaturan toko disimpan" : prefs.msg);
   };
+
+  const pickLogo = (file: File | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast("Logo harus berupa gambar");
+      return;
+    }
+    if (file.size > MAX_LOGO_BYTES) {
+      toast("Ukuran logo maksimal 200 KB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () =>
+      setPrefsForm((f) => ({ ...f, logo: String(reader.result ?? "") }));
+    reader.readAsDataURL(file);
+  };
+
+  const backup = () => {
+    downloadJson(`cadangan-toko-${stamp()}`, db);
+    toast("Cadangan data diunduh");
+  };
+
+  const pickRestore = (file: File | undefined) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result ?? "")) as DB;
+        if (!parsed || !Array.isArray(parsed.products)) throw new Error();
+        setPending(parsed);
+        setConfirm("restore");
+      } catch {
+        toast("Berkas cadangan tidak dikenali");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const logo = prefsForm.logo || db.prefs.logo;
 
   return (
     <>
       <PageHead
         title="Pengaturan Toko"
-        subtitle="Nama, alamat, dan kontak di bawah ini tercetak di kepala invoice."
+        subtitle="Identitas toko, pengaturan operasional, dan cadangan data."
         actions={
           <Link href="/invoice" className="btn">
             Lihat invoice
@@ -55,7 +139,7 @@ export function StoreSettingsView() {
           <div className="grid sm:grid-cols-2 gap-3">
             <div className="sm:col-span-2">
               <label className="f">Nama toko</label>
-              <input {...field("name")} placeholder="mis. Rainbow Kids" />
+              <input {...field("name")} placeholder="mis. Toko Anda" />
             </div>
             <div className="sm:col-span-2">
               <label className="f">Alamat toko</label>
@@ -82,20 +166,112 @@ export function StoreSettingsView() {
             </div>
           </div>
 
+          <div
+            className="text-[11px] uppercase tracking-wider mt-6 mb-2"
+            style={{ color: "var(--mu)" }}
+          >
+            Pengaturan operasional
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="f">Jatuh tempo tempo (hari)</label>
+              <input
+                type="number"
+                min={0}
+                aria-label="jatuh tempo hari"
+                value={prefsForm.dueDays}
+                onChange={(e) =>
+                  setPrefsForm((f) => ({ ...f, dueDays: Number(e.target.value) }))
+                }
+              />
+            </div>
+            <div>
+              <label className="f">Stok menipis di bawah</label>
+              <input
+                type="number"
+                min={0}
+                aria-label="ambang stok menipis"
+                value={prefsForm.minStock}
+                onChange={(e) =>
+                  setPrefsForm((f) => ({ ...f, minStock: Number(e.target.value) }))
+                }
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="f">Metode pembayaran (pisahkan dengan koma)</label>
+              <input
+                aria-label="metode pembayaran"
+                value={methods}
+                onChange={(e) => setMethods(e.target.value)}
+                placeholder="Transfer, Tunai, QRIS"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="f">Logo toko (maks. 200 KB)</label>
+              <div className="flex items-center gap-2">
+                <input
+                  ref={logoRef}
+                  type="file"
+                  accept="image/*"
+                  aria-label="unggah logo toko"
+                  className="hidden"
+                  onChange={(e) => pickLogo(e.target.files?.[0])}
+                />
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => logoRef.current?.click()}
+                >
+                  Pilih logo
+                </button>
+                {logo && (
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() =>
+                      setPrefsForm((f) => ({ ...f, logo: "" }))
+                    }
+                  >
+                    Hapus logo
+                  </button>
+                )}
+                <span className="text-[11.5px]" style={{ color: "var(--mu)" }}>
+                  Tercetak di kepala invoice
+                </span>
+              </div>
+            </div>
+            <div className="sm:col-span-2">
+              <label className="f">Catatan kaki invoice (opsional)</label>
+              <textarea
+                rows={3}
+                aria-label="catatan kaki invoice"
+                value={prefsForm.note}
+                onChange={(e) =>
+                  setPrefsForm((f) => ({ ...f, note: e.target.value }))
+                }
+                placeholder="mis. Barang yang sudah dibeli tidak dapat ditukar setelah 3 hari."
+              />
+            </div>
+          </div>
+
           <div className="flex gap-2 mt-4">
             <button
               type="button"
               className="btn p"
               onClick={save}
-              disabled={!dirty}
+              disabled={!bizDirty && !prefsDirty}
             >
               Simpan
             </button>
             <button
               type="button"
               className="btn"
-              onClick={() => setForm(db.biz)}
-              disabled={!dirty}
+              onClick={() => {
+                setBizForm(db.biz);
+                setPrefsForm(db.prefs);
+                setMethods(db.prefs.methods.join(", "));
+              }}
+              disabled={!bizDirty && !prefsDirty}
             >
               Batal
             </button>
@@ -121,39 +297,85 @@ export function StoreSettingsView() {
               paddingBottom: 14,
             }}
           >
-            <div
-              style={{
-                width: 52,
-                height: 52,
-                borderRadius: 12,
-                background: "#04123F",
-                color: "#FEC40B",
-                display: "grid",
-                placeItems: "center",
-                fontWeight: 800,
-                fontSize: 20,
-                flex: "0 0 auto",
-              }}
-            >
-              RK
-            </div>
+            {logo ? (
+              <img
+                src={logo}
+                alt="Logo toko"
+                style={{
+                  width: 52,
+                  height: 52,
+                  objectFit: "contain",
+                  borderRadius: 12,
+                  flex: "0 0 auto",
+                  background: "#fff",
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: 12,
+                  background: "#04123F",
+                  color: "#FEC40B",
+                  display: "grid",
+                  placeItems: "center",
+                  fontWeight: 800,
+                  fontSize: 20,
+                  flex: "0 0 auto",
+                }}
+              >
+                {initials(bizForm.name)}
+              </div>
+            )}
             <div>
               <div style={{ fontWeight: 800, fontSize: 17 }}>
-                {form.name || "Nama toko"}
+                {bizForm.name || "Nama toko"}
               </div>
               <div style={{ color: "#555", lineHeight: 1.5 }}>
-                {form.addr || "Alamat toko"}
+                {bizForm.addr || "Alamat toko"}
                 <br />
-                {form.phone || "Telepon"} · {form.email || "Email"}
-                {form.npwp?.trim() ? (
+                {bizForm.phone || "Telepon"} · {bizForm.email || "Email"}
+                {bizForm.npwp?.trim() ? (
                   <>
                     <br />
-                    NPWP {form.npwp}
+                    NPWP {bizForm.npwp}
                   </>
                 ) : null}
               </div>
             </div>
           </div>
+          <div className="text-[12px] mt-3" style={{ color: "var(--mu)" }}>
+            Catatan kaki: {prefsForm.note || "—"}
+          </div>
+        </div>
+      </div>
+
+      <div className="card p-5 mt-4">
+        <div
+          className="text-[11px] uppercase tracking-wider mb-1"
+          style={{ color: "var(--mu)" }}
+        >
+          Cadangan data
+        </div>
+        <p className="text-[12.5px] mb-3" style={{ color: "var(--mu)" }}>
+          Unduh seluruh data toko sebagai berkas JSON, atau pulihkan dari
+          berkas cadangan. Akun login tidak ikut berubah.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className="btn" onClick={backup}>
+            Unduh cadangan (JSON)
+          </button>
+          <label className="btn" style={{ cursor: "pointer" }}>
+            Pulihkan dari cadangan
+            <input
+              type="file"
+              accept="application/json,.json"
+              aria-label="pilih berkas cadangan"
+              className="hidden"
+              onChange={(e) => pickRestore(e.target.files?.[0])}
+            />
+          </label>
         </div>
       </div>
 
@@ -194,6 +416,24 @@ export function StoreSettingsView() {
         confirmLabel="Ya, hapus semua"
         danger
         onConfirm={clearData}
+      />
+
+      <ConfirmDialog
+        open={confirm === "restore"}
+        onClose={() => {
+          setConfirm(null);
+          setPending(null);
+        }}
+        title="Pulihkan data dari cadangan?"
+        description="Seluruh data toko saat ini akan diganti dengan isi berkas cadangan. Tindakan ini tidak bisa dibatalkan."
+        confirmLabel="Ya, pulihkan"
+        onConfirm={() => {
+          if (pending) {
+            const res = restoreData(pending);
+            toast(res.msg);
+          }
+          setPending(null);
+        }}
       />
     </>
   );

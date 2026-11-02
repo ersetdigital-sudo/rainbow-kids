@@ -1,6 +1,6 @@
 import { getSupabase } from "../supabase";
 import type { DB } from "../types";
-import { emptyDb } from "../workspace";
+import { DEFAULT_PREFS, emptyDb } from "../workspace";
 import { loadApprovals, saveApprovals } from "./approvals";
 import { loadExpenses, loadHistory, saveExpenses, saveHistory } from "./logs";
 import { loadOpnames, saveOpnames } from "./opnames";
@@ -63,7 +63,7 @@ export async function loadStore(): Promise<DB | null> {
     if (legacy) {
       await saveStore(emptyDb(), legacy);
       // Penanda supaya data hasil impor tidak dimunculkan lagi setelah dihapus.
-      await markInitialized(legacy.biz);
+      await markInitialized(legacy.biz, legacy.prefs ?? DEFAULT_PREFS);
       return legacy;
     }
     return null;
@@ -83,6 +83,7 @@ export async function loadStore(): Promise<DB | null> {
     users: [],
     perms: settings.perms,
     biz: settings.biz,
+    prefs: settings.prefs,
     user: "",
   };
 }
@@ -90,8 +91,8 @@ export async function loadStore(): Promise<DB | null> {
 /** Simpan perubahan state toko ke tabel masing-masing (hanya yang berubah). */
 export async function saveStore(prev: DB, next: DB): Promise<void> {
   await saveSettings(
-    { biz: prev.biz, perms: prev.perms },
-    { biz: next.biz, perms: next.perms },
+    { biz: prev.biz, prefs: prev.prefs, perms: prev.perms },
+    { biz: next.biz, prefs: next.prefs, perms: next.perms },
   );
   await saveProducts(prev.products, next.products);
   await saveCustomers(prev.customers, next.customers);

@@ -8,11 +8,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   return {
     title: `Invoice ${id}`,
-    description: `Invoice penjualan ${id} dari Rainbow Kids, lengkap dengan rincian barang dan status pembayaran.`,
+    description: `Invoice penjualan ${id}, lengkap dengan rincian barang dan status pembayaran.`,
     alternates: { canonical: `/invoice/${id}` },
     openGraph: {
-      title: `Invoice ${id} · Rainbow Kids`,
-      description: "Rincian invoice penjualan Rainbow Kids.",
+      title: `Invoice ${id}`,
+      description: "Rincian invoice penjualan.",
     },
   };
 }

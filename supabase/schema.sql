@@ -20,7 +20,13 @@ create table if not exists public.store_settings (
   phone text not null default '',
   email text not null default '',
   npwp text not null default '',
-  bank text not null default ''
+  bank text not null default '',
+  -- Pengaturan operasional (lihat supabase/migration-002-settings.sql)
+  logo text not null default '',
+  note text not null default '',
+  due_days smallint not null default 14,
+  min_stock smallint not null default 15,
+  pay_methods text not null default 'Transfer|Tunai|QRIS'
 );
 
 create table if not exists public.role_permissions (

@@ -1,5 +1,5 @@
 import { queueRemoteSave } from "./remote";
-import { DEFAULT_PERMS, emptyDb } from "./workspace";
+import { DEFAULT_PERMS, DEFAULT_PREFS, emptyDb } from "./workspace";
 import type { DB, Role } from "./types";
 
 const KEY = "rk_data_v3";
@@ -20,12 +20,18 @@ function migrate(db: DB): DB {
     Record<string, string>
   >;
   const perms = {
-    Owner: old.Owner ?? DEFAULT_PERMS.Owner,
-    Admin: old.Admin ?? DEFAULT_PERMS.Admin,
-    Approver: old.Approver ?? DEFAULT_PERMS.Approver,
-    User: (old.User ?? old.Staff ?? DEFAULT_PERMS.User) as Record<string, string>,
+    Owner: { ...DEFAULT_PERMS.Owner, ...old.Owner },
+    Admin: { ...DEFAULT_PERMS.Admin, ...old.Admin },
+    Approver: { ...DEFAULT_PERMS.Approver, ...old.Approver },
+    User: {
+      ...DEFAULT_PERMS.User,
+      ...(old.User ?? old.Staff),
+    } as Record<string, string>,
   } as DB["perms"];
-  return { ...db, users, perms };
+  // Snapshot lama belum punya pengaturan operasional — lengkapi dengan bawaan
+  // supaya logo/jatuh tempo/ambang stok tidak pernah `undefined`.
+  const prefs = { ...DEFAULT_PREFS, ...(db.prefs ?? {}) };
+  return { ...db, users, perms, prefs };
 }
 
 let clientCache: DB | null = null;

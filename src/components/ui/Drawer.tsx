@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
+import { useStoreName } from "@/lib/store";
 
 function useIsMobile() {
   const [mobile, setMobile] = useState(false);
@@ -24,7 +25,7 @@ export function Drawer({
   header,
   wide,
   narrow,
-  kicker = "Rainbow Kids",
+  kicker,
 }: {
   open: boolean;
   onClose: () => void;
@@ -35,9 +36,12 @@ export function Drawer({
   header?: React.ReactNode;
   wide?: boolean;
   narrow?: boolean;
+  /** Label kecil di atas judul; bawaannya nama toko dari Pengaturan. */
   kicker?: string;
 }) {
   const isMobile = useIsMobile();
+  const storeName = useStoreName();
+  const label = kicker ?? storeName;
 
   useEffect(() => {
     if (!open) return;
@@ -88,7 +92,7 @@ export function Drawer({
                   <div className="min-w-0 flex-1">{header}</div>
                 ) : (
                   <div>
-                    <div className="dkick">{kicker}</div>
+                    {label && <div className="dkick">{label}</div>}
                     <h3 className="dtitle">{title}</h3>
                   </div>
                 )}

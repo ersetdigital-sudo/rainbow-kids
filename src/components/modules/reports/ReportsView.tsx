@@ -618,7 +618,7 @@ function StockTab() {
         <Kpi
           label="Potensi laba"
           value={rp(mj - mc)}
-          sub={`${av.filter((v) => v.stock < 15).length} varian menipis`}
+          sub={`${av.filter((v) => v.stock < db.prefs.minStock).length} varian menipis`}
           icon="trend"
           color="#15803D"
           bg="#E7F6EC"

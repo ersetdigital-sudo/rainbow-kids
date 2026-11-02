@@ -16,6 +16,7 @@ const MODULES: [ModuleKey, string][] = [
   ["opname", "Stok Opname"],
   ["ar", "Piutang"],
   ["report", "Laporan"],
+  ["expense", "Biaya Operasional"],
   ["approval", "Approval"],
   ["users", "Pengguna"],
 ];

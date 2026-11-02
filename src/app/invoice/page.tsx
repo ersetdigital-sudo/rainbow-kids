@@ -4,7 +4,7 @@ import { InvoiceView } from "@/components/modules/invoice/InvoiceView";
 export const metadata: Metadata = {
   title: "Invoice",
   description:
-    "Template invoice A4 untuk toko Rainbow Kids: rincian barang, total, pembayaran, dan sisa tagihan.",
+    "Template invoice A4: rincian barang, total, pembayaran, dan sisa tagihan.",
   alternates: { canonical: "/invoice" },
 };
 

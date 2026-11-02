@@ -12,40 +12,40 @@ const jakarta = Plus_Jakarta_Sans({
   display: "swap",
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://rainbowkids.id";
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Rainbow Kids · Business Suite Manajemen Bisnis Toko Anak",
-    template: "%s · Rainbow Kids",
+    default: "Business Suite Manajemen Bisnis Toko",
+    template: "%s · Business Suite",
   },
   description:
-    "Rainbow Kids adalah business suite untuk toko anak: penjualan, stok, pembelian supplier, stok opname, piutang, laporan, dan approval harga dalam satu aplikasi.",
-  applicationName: "Rainbow Kids Business Suite",
+    "Business suite untuk toko: penjualan, stok, pembelian supplier, stok opname, biaya operasional, piutang, laporan, dan approval harga dalam satu aplikasi.",
+  applicationName: "Business Suite",
   keywords: [
-    "manajemen toko anak",
-    "kasir toko anak",
+    "manajemen toko",
+    "kasir toko",
     "stok opname",
     "piutang toko",
     "approval harga",
-    "Rainbow Kids",
+    "biaya operasional",
   ],
-  authors: [{ name: "Rainbow Kids" }],
+  authors: [{ name: "Business Suite" }],
   openGraph: {
     type: "website",
     locale: "id_ID",
     url: siteUrl,
-    siteName: "Rainbow Kids",
-    title: "Rainbow Kids · Business Suite Manajemen Bisnis Toko Anak",
+    siteName: "Business Suite",
+    title: "Business Suite Manajemen Bisnis Toko",
     description:
-      "Catat penjualan, kelola stok, dan pantau piutang toko anak dalam satu dashboard.",
+      "Catat penjualan, kelola stok, dan pantau piutang toko dalam satu dashboard.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Rainbow Kids · Business Suite",
+    title: "Business Suite",
     description:
-      "Penjualan, stok, piutang, dan approval harga untuk toko anak.",
+      "Penjualan, stok, piutang, dan approval harga untuk toko.",
   },
   robots: { index: true, follow: true },
 };

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { LoginScreen } from "@/components/auth/LoginScreen";
 import { useAuth } from "@/lib/auth";
-import { useStore } from "@/lib/store";
+import { useStore, useStoreName } from "@/lib/store";
 import { BottomNav } from "./BottomNav";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
@@ -37,6 +37,7 @@ function SidebarFallback() {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { configured, ready, session } = useAuth();
   const { storeReady } = useStore();
+  const storeName = useStoreName();
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
@@ -45,6 +46,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- default awal hanya bisa dibaca setelah mount
     if (window.innerWidth >= 900 && window.innerWidth < 1200) setCollapsed(true);
   }, []);
+
+  // Judul tab mengikuti nama toko di Pengaturan Toko (bukan nama brand di kode).
+  useEffect(() => {
+    if (!storeReady || !storeName) return;
+    document.title = `${storeName} · Business Suite`;
+  }, [storeReady, storeName]);
 
   const toggleSidebar = () => {
     if (window.matchMedia("(max-width: 899px)").matches) setOpen(true);

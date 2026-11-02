@@ -55,7 +55,9 @@ export function DashboardView() {
   );
 
   const minusStock = variants.filter((v) => v.stock < 0);
-  const lowStock = variants.filter((v) => v.stock >= 0 && v.stock < 15);
+  const lowStock = variants.filter(
+    (v) => v.stock >= 0 && v.stock < db.prefs.minStock,
+  );
 
   const days = useMemo(
     () => [...Array(14)].map((_, i) => addDays(TODAY, i - 13)),
@@ -69,7 +71,7 @@ export function DashboardView() {
   );
   const total14 = vals.reduce((a, b) => a + b, 0);
 
-  const low = variants.filter((v) => v.stock < 15);
+  const low = variants.filter((v) => v.stock < db.prefs.minStock);
   const pending = db.approvals.filter((a) => a.status === "Menunggu").length;
 
   const yesterday = sum(

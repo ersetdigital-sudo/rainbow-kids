@@ -52,7 +52,7 @@ export function SaleFormDrawer({
     customerId: undefined,
     date: TODAY,
     type: "",
-    due: addDays(TODAY, 14),
+    due: addDays(TODAY, db.prefs.dueDays),
     items: variants[0]
       ? [{ vid: variants[0].id, qty: 1, price: variants[0].price }]
       : [],

@@ -13,6 +13,9 @@ form yang jadi bottom sheet di layar kecil.
 ## Menyambung Supabase
 
 1. Jalankan `supabase/schema.sql` di project Supabase: **Dashboard → SQL Editor → New query → Run**.
+   Kalau database-nya sudah dibuat sebelum ada pengaturan tambahan (logo invoice, jatuh tempo
+   bawaan, ambang stok menipis, metode pembayaran), jalankan sekali juga
+   `supabase/migration-002-settings.sql` — hanya menambah 5 kolom di `store_settings`.
    Skrip ini membuat tabel relasional: `products` + `product_variants`, `customers`,
    `suppliers`, `sales` + `sale_items` + `sale_payments`, `purchases` + `purchase_items`,
    `opnames` + `opname_lines`, `approvals`, `stock_history`, `expenses`,
@@ -99,13 +102,17 @@ Daftar pengguna dan role-nya adalah akun Supabase Auth yang sebenarnya
 | Pembelian supplier | Pembelian | `purchases`, `purchase_items` |
 | Stok opname | Stok Opname | `opnames`, `opname_lines` |
 | Approval, histori stok, biaya | Approval & Laporan | `approvals`, `stock_history`, `expenses` |
+| Biaya di luar order (sewa, gaji, listrik) | Biaya Operasional | `expenses` |
+| Pengaturan operasional (logo, catatan invoice, jatuh tempo, ambang stok, metode bayar) | Pengaturan Toko | `store_settings` |
+| Cadangan / pulihkan seluruh data | Pengaturan Toko | unduh & unggah berkas JSON |
 
-Sisa nilai branding yang masih di kode hanya teks identitas aplikasi (judul
-halaman/metadata SEO `Rainbow Kids`), bukan data toko.
+Tidak ada lagi data toko maupun nama brand yang ditulis di kode: nama toko, logo,
+dan catatan invoice berasal dari Pengaturan Toko, sedangkan metadata aplikasi memakai
+nama produk netral ("Business Suite").
 | Kontak WhatsApp / tautan sosial | tidak ada di HTML asli | belum ada — tambahkan di `src/components/layout/Topbar.tsx` |
 | Logo & gambar produk | tidak ada di HTML asli (semua ikon SVG inline) | `public/` |
 | Placeholder foto invoice | tidak ada | `src/components/modules/invoice/InvoiceView.tsx` |
-| Domain produksi | fallback `https://rainbowkids.id` | `NEXT_PUBLIC_SITE_URL` |
+| Domain produksi | fallback `http://localhost:3000` | `NEXT_PUBLIC_SITE_URL` |
 
 ## Alur kerja (hasil revisi sesuai feedback customer)
 
@@ -145,10 +152,14 @@ PENJUALAN BARU ──ajukan──▶ approval Owner ──▶ invoice tercatat +
 | Status bayar pembelian | “Belum Lunas” → ajukan pelunasan → approval Owner → “Lunas” |
 | Ekspor | Tombol “Ekspor Excel” di Penjualan & Piutang → `.csv` (BOM UTF-8, separator `;`) yang langsung dibuka Excel |
 | Riwayat perubahan | Varian/produk, pelunasan, dan status pembelian tercatat di menu Approval (sebelum → sesudah) |
+| Biaya operasional | Dicatat di menu **Biaya Operasional** (tanggal, kategori, jumlah) dan langsung masuk tab Biaya di Laporan — tanpa ini laba bersih hanya menghitung biaya per order |
+| Pengaturan operasional | Jatuh tempo tempo, ambang stok menipis, metode pembayaran, logo, dan catatan kaki invoice diatur di Pengaturan Toko (bukan ditulis di kode) |
+| Impor produk | Tombol **Template CSV** + **Impor CSV** di Produk & Stok: satu baris = satu varian (kategori, nama, varian, stok, modal, harga) |
 
 ## Fitur
 
 - **Dashboard** — omzet hari/bulan, estimasi laba, total & nilai stok, grafik area 14 hari, piutang aktif, transaksi terbaru, banner peringatan restock.
+- **Biaya Operasional** — catat/ubah/hapus pengeluaran di luar order, filter per bulan, ekspor CSV; angkanya masuk tab Biaya di Laporan.
 - **Penjualan** — pelanggan dari popup data tersimpan (+ tambah baru), harga jual bebas dengan histori harga sebagai acuan, kolom tanggal order + jatuh tempo, biaya ongkir/packing/lain, filter status bayar (lunas/belum lunas) & jenis, pencarian no. invoice/pelanggan, detail order + laba total & laba per unit, transaksi baru masuk approval Owner, pengajuan ubah harga/biaya, ekspor Excel.
 - **Piutang** — ringkasan total tagihan (belum jatuh tempo / jatuh tempo / terlambat) + kartu status, pencarian no. invoice/pelanggan, pembayaran sebagian (langsung berlaku) & pengajuan pelunasan (approval Owner), ekspor Excel.
 - **Produk & Stok** — kategori bebas, varian, rentang harga jual min–max, stok minus/prioritas restock, riwayat perubahan, pengajuan ubah harga (lewat approval).

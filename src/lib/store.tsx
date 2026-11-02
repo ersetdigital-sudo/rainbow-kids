@@ -14,7 +14,7 @@ import { TODAY, nowStamp } from "./date";
 import { fetchRemoteState, setRemoteErrorHandler } from "./remote";
 import { uid } from "./format";
 import { monthCode, nextId } from "./ids";
-import { emptyDb } from "./workspace";
+import { DEFAULT_PERMS, DEFAULT_PREFS, emptyDb } from "./workspace";
 import { createAccount, fetchAccounts, patchAccount } from "./users";
 import {
   customerStatus,
@@ -45,6 +45,7 @@ import type {
   DB,
   ModuleKey,
   OpnameLine,
+  Prefs,
   PurchaseRequest,
   Role,
   Sale,
@@ -74,6 +75,15 @@ export type PurchaseDraft = {
   nota: string;
   date: string;
   items: { vid: string; qty: number; cost: number }[];
+};
+
+export type ImportProductRow = {
+  cat: string;
+  name: string;
+  variant: string;
+  stock: number;
+  cost: number;
+  price: number;
 };
 
 export type VariantInput = {
@@ -242,6 +252,97 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         },
       }));
       return { ok: true, msg: "Data toko disimpan" };
+    },
+    [],
+  );
+
+  /** Pengaturan operasional toko: identitas cetak, tempo, ambang stok, metode bayar. */
+  const updatePrefs = useCallback<StoreValue["updatePrefs"]>(
+    (patch) => {
+      const methods = patch.methods.map((m) => m.trim()).filter(Boolean);
+      if (!methods.length)
+        return { ok: false, msg: "Isi minimal satu metode pembayaran" };
+      if (!Number.isFinite(patch.dueDays) || patch.dueDays < 0)
+        return { ok: false, msg: "Jatuh tempo harus berupa angka hari" };
+      if (!Number.isFinite(patch.minStock) || patch.minStock < 0)
+        return { ok: false, msg: "Ambang stok menipis harus berupa angka" };
+      setSnapshot((prev) => ({
+        ...prev,
+        prefs: {
+          ...prev.prefs,
+          ...patch,
+          methods,
+          dueDays: Math.round(patch.dueDays),
+          minStock: Math.round(patch.minStock),
+        },
+      }));
+      return { ok: true, msg: "Pengaturan toko disimpan" };
+    },
+    [],
+  );
+
+  /* ---------------- Biaya operasional ---------------- */
+
+  /** Catat pengeluaran di luar order (listrik, gaji, sewa, …). */
+  const addExpense = useCallback<StoreValue["addExpense"]>(
+    (e) => {
+      const cat = e.cat.trim();
+      if (!cat) return { ok: false, msg: "Isi kategori biaya" };
+      if (!(e.amt > 0)) return { ok: false, msg: "Jumlah biaya harus lebih dari 0" };
+      setSnapshot((prev) => ({
+        ...prev,
+        expenses: [...prev.expenses, { date: e.date, cat, amt: e.amt }],
+      }));
+      return { ok: true, msg: "Biaya dicatat" };
+    },
+    [],
+  );
+
+  const updateExpense = useCallback<StoreValue["updateExpense"]>(
+    (index, patch) => {
+      const current = getSnapshot().expenses[index];
+      if (!current) return { ok: false, msg: "Biaya tidak ditemukan" };
+      const cat = (patch.cat ?? current.cat).trim();
+      const amt = patch.amt ?? current.amt;
+      if (!cat) return { ok: false, msg: "Isi kategori biaya" };
+      if (!(amt > 0)) return { ok: false, msg: "Jumlah biaya harus lebih dari 0" };
+      setSnapshot((prev) => ({
+        ...prev,
+        expenses: prev.expenses.map((e, i) =>
+          i === index ? { date: patch.date ?? e.date, cat, amt } : e,
+        ),
+      }));
+      return { ok: true, msg: "Biaya diperbarui" };
+    },
+    [],
+  );
+
+  const removeExpense = useCallback<StoreValue["removeExpense"]>((index) => {
+    if (!getSnapshot().expenses[index])
+      return { ok: false, msg: "Biaya tidak ditemukan" };
+    setSnapshot((prev) => ({
+      ...prev,
+      expenses: prev.expenses.filter((_, i) => i !== index),
+    }));
+    return { ok: true, msg: "Biaya dihapus" };
+  }, []);
+
+  /* ---------------- Cadangan data ---------------- */
+
+  /** Pulihkan seluruh data toko dari berkas cadangan (akun login tidak diubah). */
+  const restoreData = useCallback<StoreValue["restoreData"]>(
+    (data) => {
+      if (!data || !Array.isArray(data.products))
+        return { ok: false, msg: "Berkas cadangan tidak dikenali" };
+      setSnapshot((prev) => ({
+        ...emptyDb(),
+        ...data,
+        users: prev.users,
+        user: prev.user,
+        prefs: { ...DEFAULT_PREFS, ...(data.prefs ?? {}) },
+        perms: { ...DEFAULT_PERMS, ...(data.perms ?? {}) },
+      }));
+      return { ok: true, msg: "Data toko dipulihkan dari cadangan" };
     },
     [],
   );
@@ -776,6 +877,60 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     },
     [],
   );
+
+  /**
+   * Impor varian dari CSV/Excel. Satu baris = satu varian; baris dengan
+   * kategori + nama produk yang sama digabung jadi satu produk.
+   */
+  const importProducts = useCallback<StoreValue["importProducts"]>((rows) => {
+    const clean = rows.filter((r) => r.cat.trim() && r.name.trim());
+    if (!clean.length)
+      return { ok: false, msg: "Tidak ada baris valid (kategori & nama wajib)" };
+    setSnapshot((prev) => {
+      const products = prev.products.map((p) => ({
+        ...p,
+        variants: [...p.variants],
+      }));
+      for (const row of clean) {
+        const cat = row.cat.trim();
+        const name = row.name.trim();
+        const price = row.price > 0 ? row.price : 0;
+        let product = products.find((p) => p.cat === cat && p.name === name);
+        if (!product) {
+          product = {
+            id: uid("p"),
+            cat,
+            name,
+            minPrice: price,
+            maxPrice: price,
+            variants: [],
+          };
+          products.push(product);
+        }
+        product.minPrice = Math.min(product.minPrice || price, price);
+        product.maxPrice = Math.max(product.maxPrice, price);
+        const variantName = (row.variant || "Default").trim();
+        const existing = product.variants.find(
+          (v) => v.name.toLowerCase() === variantName.toLowerCase(),
+        );
+        if (existing) {
+          existing.stock = row.stock;
+          existing.cost = row.cost;
+          existing.price = price;
+        } else {
+          product.variants.push({
+            id: uid("v"),
+            name: variantName,
+            stock: row.stock,
+            cost: row.cost,
+            price,
+          });
+        }
+      }
+      return { ...prev, products };
+    });
+    return { ok: true, msg: `${clean.length} varian diimpor` };
+  }, []);
 
   /** Pengajuan ubah nama varian / harga modal / rentang harga jual. */
   const submitChange = useCallback<StoreValue["submitChange"]>(
@@ -1857,6 +2012,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       toast,
       clearData,
       updateBiz,
+      updatePrefs,
+      addExpense,
+      updateExpense,
+      removeExpense,
+      restoreData,
       addCustomer,
       requestCustomerEdit,
       requestCustomerDelete,
@@ -1866,6 +2026,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       recordPayment,
       requestSaleDelete,
       addProduct,
+      importProducts,
       submitChange,
       savePurchase,
       requestPurchaseLunas,
@@ -1887,6 +2048,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       toast,
       clearData,
       updateBiz,
+      updatePrefs,
+      addExpense,
+      updateExpense,
+      removeExpense,
+      restoreData,
       addCustomer,
       requestCustomerEdit,
       requestCustomerDelete,
@@ -1896,6 +2062,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       recordPayment,
       requestSaleDelete,
       addProduct,
+      importProducts,
       submitChange,
       savePurchase,
       requestPurchaseLunas,
@@ -1935,6 +2102,14 @@ type StoreValue = {
   toast: (msg: string) => void;
   clearData: () => void;
   updateBiz: (patch: Biz) => Result;
+  updatePrefs: (patch: Prefs) => Result;
+  addExpense: (e: { date: string; cat: string; amt: number }) => Result;
+  updateExpense: (
+    index: number,
+    patch: { date?: string; cat?: string; amt?: number },
+  ) => Result;
+  removeExpense: (index: number) => Result;
+  restoreData: (data: DB) => Result;
   addCustomer: (c: {
     name: string;
     phone?: string;
@@ -1964,6 +2139,7 @@ type StoreValue = {
     maxPrice: number;
     variants: VariantInput[];
   }) => Result;
+  importProducts: (rows: ImportProductRow[]) => Result;
   submitChange: (
     vid: string,
     changes: {
@@ -1999,6 +2175,12 @@ type StoreValue = {
   ) => Promise<Result>;
   cyclePerm: (role: Role, module: ModuleKey) => void;
 };
+
+/** Nama toko bila tersedia (dipakai komponen kerangka seperti Drawer). */
+export function useStoreName(): string {
+  const ctx = useContext(StoreContext);
+  return ctx?.db.biz.name ?? "";
+}
 
 export function useStore(): StoreValue {
   const ctx = useContext(StoreContext);

@@ -55,6 +55,7 @@ export const NAV: NavGroup[] = [
   {
     items: [
       { href: "/reports", label: "Laporan", icon: "report" },
+      { href: "/expenses", label: "Biaya Operasional", icon: "invoice" },
       { href: "/history", label: "Histori", icon: "hist" },
       { href: "/approvals", label: "Approval & Audit", icon: "approval" },
       { href: "/users", label: "Pengguna & Akses", icon: "users" },
