@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useStore } from "@/lib/store";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { PageHead } from "@/components/ui/PageHead";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EditUserDrawer } from "./EditUserDrawer";
 import { InviteUserDrawer } from "./InviteUserDrawer";
 import type { AppUser, ModuleKey, Role } from "@/lib/types";
@@ -38,9 +39,12 @@ const TONE: Record<string, string> = {
 };
 
 export function UsersView() {
-  const { db, setUserRole, toggleUser, cyclePerm, toast } = useStore();
+  const { db, setUserRole, toggleUser, deleteUser, cyclePerm, toast } =
+    useStore();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [editIndex, setEditIndex] = useState<number | null>(null);
+  const [deleteIndex, setDeleteIndex] = useState<number | null>(null);
+  const pending = deleteIndex === null ? null : (db.users[deleteIndex] ?? null);
 
   const columns: Column<AppUser>[] = [
     {
@@ -105,13 +109,20 @@ export function UsersView() {
       noLabel: true,
       align: "right",
       render: (u, i) => (
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
           <button
             type="button"
             className="btn s"
             onClick={() => setEditIndex(i)}
           >
             Edit
+          </button>
+          <button
+            type="button"
+            className="btn s soft-danger"
+            onClick={() => setDeleteIndex(i)}
+          >
+            Hapus
           </button>
         </div>
       ),
@@ -228,6 +239,26 @@ export function UsersView() {
           </span>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(pending)}
+        onClose={() => setDeleteIndex(null)}
+        title={`Hapus akun ${pending?.name ?? ""}?`}
+        description={
+          <>
+            Akun login <b>{pending?.email}</b> dihapus permanen dan tidak bisa
+            masuk lagi. Data toko yang sudah tercatat tidak ikut terhapus. Bila
+            ini akun terakhir, aplikasi kembali menampilkan{" "}
+            <b>Buat akun Owner</b> supaya pemilik baru bisa mendaftar sendiri.
+          </>
+        }
+        confirmLabel="Hapus akun"
+        danger
+        onConfirm={() => {
+          if (deleteIndex === null) return;
+          deleteUser(deleteIndex).then((res) => toast(res.msg));
+        }}
+      />
 
       <InviteUserDrawer open={inviteOpen} onClose={() => setInviteOpen(false)} />
       <EditUserDrawer

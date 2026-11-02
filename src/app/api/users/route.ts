@@ -171,6 +171,43 @@ export async function PATCH(request: Request) {
   return Response.json({ ok: true, user: toAppUser(data.user) });
 }
 
+/** Hapus akun login permanen dari Supabase Auth. */
+export async function DELETE(request: Request) {
+  const ctx = await requireCaller(request);
+  if (ctx instanceof Response) return ctx;
+
+  const body = (await request.json().catch(() => null)) as {
+    email?: string;
+  } | null;
+
+  const email = body?.email?.trim().toLowerCase() ?? "";
+  if (!EMAIL_RE.test(email)) {
+    return Response.json(
+      { ok: false, msg: "Email pengguna tidak valid" },
+      { status: 400 },
+    );
+  }
+
+  const target = (await listUsers(ctx.admin)).find(
+    (u) => (u.email ?? "").toLowerCase() === email,
+  );
+  if (!target) {
+    return Response.json(
+      { ok: false, msg: "Pengguna tidak ditemukan" },
+      { status: 404 },
+    );
+  }
+
+  const { error } = await ctx.admin.auth.admin.deleteUser(
+    target.id as string,
+  );
+  if (error) {
+    return Response.json({ ok: false, msg: error.message }, { status: 400 });
+  }
+
+  return Response.json({ ok: true });
+}
+
 type Body = {
   name?: string;
   email?: string;

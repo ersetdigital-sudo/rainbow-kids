@@ -62,6 +62,27 @@ export async function patchAccount(patch: AccountPatch): Promise<Result> {
   }
 }
 
+/** Hapus akun login dari Supabase Auth. */
+export async function removeAccount(email: string): Promise<Result> {
+  if (!getSupabase()) return { ok: false, msg: "Supabase belum dikonfigurasi" };
+  try {
+    const res = await fetch("/api/users", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+      body: JSON.stringify({ email }),
+    });
+    const json = (await res.json().catch(() => null)) as
+      | { ok?: boolean; msg?: string }
+      | null;
+    return {
+      ok: Boolean(json?.ok),
+      msg: json?.ok ? "" : json?.msg || "Gagal menghapus akun",
+    };
+  } catch {
+    return { ok: false, msg: "Gagal menghubungi server" };
+  }
+}
+
 /** Buat akun login baru (email + password) di Supabase Auth. */
 export async function createAccount(input: {
   name: string;

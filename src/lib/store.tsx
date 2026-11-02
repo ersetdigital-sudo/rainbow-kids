@@ -15,7 +15,12 @@ import { fetchRemoteState, setRemoteErrorHandler } from "./remote";
 import { uid } from "./format";
 import { monthCode, nextId } from "./ids";
 import { DEFAULT_PERMS, DEFAULT_PREFS, emptyDb } from "./workspace";
-import { createAccount, fetchAccounts, patchAccount } from "./users";
+import {
+  createAccount,
+  fetchAccounts,
+  patchAccount,
+  removeAccount,
+} from "./users";
 import {
   customerStatus,
   overdueSales,
@@ -138,7 +143,7 @@ const StoreContext = createContext<StoreValue | null>(null);
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const db = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-  const { configured, ready, session } = useAuth();
+  const { configured, ready, session, signOut } = useAuth();
   const [toasts, setToasts] = useState<{ id: number; msg: string }[]>([]);
   // Akun yang datanya sudah selesai dibaca dari Supabase. Selama belum sama
   // dengan sesi aktif, UI menunggu supaya dashboard tidak tampil kosong dulu.
@@ -1990,6 +1995,41 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [configured],
   );
 
+  /**
+   * Hapus akun login. Akun di Supabase Auth dihapus lebih dulu; bila yang
+   * dihapus adalah akun yang sedang dipakai, sesi ikut dicabut (keluar).
+   * Bila akun terakhir dihapus, aplikasi kembali ke layar "Buat akun Owner".
+   */
+  const deleteUser = useCallback<StoreValue["deleteUser"]>(
+    async (index) => {
+      const current = getSnapshot();
+      const user = current.users[index];
+      if (!user) return { ok: false, msg: "Pengguna tidak ditemukan" };
+
+      if (configured) {
+        const res = await removeAccount(user.email);
+        if (!res.ok) return res;
+      }
+
+      const wasActive = isActiveUser(current.user, user);
+      setSnapshot((prev) => ({
+        ...prev,
+        users: prev.users.filter((_, i) => i !== index),
+        user: wasActive ? "" : prev.user,
+      }));
+
+      const isMe =
+        configured &&
+        (session?.user.email ?? "").toLowerCase() === user.email.toLowerCase();
+      if (isMe) {
+        await signOut();
+        return { ok: true, msg: "Akun dihapus — Anda telah keluar" };
+      }
+      return { ok: true, msg: "Akun dihapus" };
+    },
+    [configured, session, signOut],
+  );
+
   const cyclePerm = useCallback<StoreValue["cyclePerm"]>((role, module) => {
     setSnapshot((prev) => {
       const current = prev.perms[role][module];
@@ -2040,6 +2080,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       toggleUser,
       inviteUser,
       updateUser,
+      deleteUser,
       cyclePerm,
     }),
     [
@@ -2076,6 +2117,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       toggleUser,
       inviteUser,
       updateUser,
+      deleteUser,
       cyclePerm,
     ],
   );
@@ -2173,6 +2215,7 @@ type StoreValue = {
     index: number,
     patch: { name: string; email: string; role: Role },
   ) => Promise<Result>;
+  deleteUser: (index: number) => Promise<Result>;
   cyclePerm: (role: Role, module: ModuleKey) => void;
 };
 
