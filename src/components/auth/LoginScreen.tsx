@@ -55,7 +55,10 @@ export function LoginScreen() {
 
     const result = await signIn(email, password);
     setBusy(false);
-    if (!result.ok) setError(result.msg);
+    if (!result.ok) {
+      setError(result.msg);
+      setPassword("");
+    }
   };
 
   return (
@@ -105,6 +108,7 @@ export function LoginScreen() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               autoComplete="name"
+              disabled={busy}
               required
             />
           </>
@@ -116,6 +120,7 @@ export function LoginScreen() {
           autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          disabled={busy}
           required
         />
 
@@ -126,6 +131,7 @@ export function LoginScreen() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder={needsOwner ? "Minimal 6 karakter" : undefined}
+          disabled={busy}
           required
         />
 

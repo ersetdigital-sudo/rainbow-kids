@@ -13,6 +13,21 @@ import { getSupabase, isSupabaseConfigured } from "./supabase";
 
 type Result = { ok: boolean; msg: string };
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Pesan error Supabase Auth diterjemahkan agar mudah dipahami pengguna. */
+const AUTH_ERRORS: Record<string, string> = {
+  "Invalid login credentials": "Email atau password salah",
+  "User not found": "Email atau password salah",
+  "Email not confirmed": "Email belum dikonfirmasi. Cek kotak masuk email.",
+  "Email rate limit exceeded": "Terlalu banyak percobaan masuk. Coba lagi nanti.",
+  "Too many requests": "Terlalu banyak percobaan masuk. Coba lagi nanti.",
+};
+
+function authError(message: string): string {
+  return AUTH_ERRORS[message] ?? message;
+}
+
 type AuthValue = {
   /** True bila Supabase (URL + anon key) tersedia. */
   configured: boolean;
@@ -52,16 +67,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  /**
+   * Verifikasi email & password pengguna ke Supabase Auth.
+   * Mengembalikan `ok: false` beserta pesan siap tampil bila gagal.
+   */
   const signIn = useCallback(
     async (email: string, password: string): Promise<Result> => {
       const supabase = getSupabase();
       if (!supabase) return { ok: false, msg: "Supabase belum dikonfigurasi" };
-      const { error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
+
+      const mail = email.trim().toLowerCase();
+      if (!mail) return { ok: false, msg: "Isi email" };
+      if (!EMAIL_RE.test(mail)) {
+        return { ok: false, msg: "Format email tidak valid" };
+      }
+      if (!password) return { ok: false, msg: "Isi password" };
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: mail,
         password,
       });
-      if (error) return { ok: false, msg: error.message };
-      return { ok: true, msg: "Masuk" };
+      if (error) return { ok: false, msg: authError(error.message) };
+      if (!data.user) return { ok: false, msg: "Gagal masuk. Coba lagi." };
+
+      return { ok: true, msg: `Masuk sebagai ${data.user.email ?? mail}` };
     },
     [],
   );

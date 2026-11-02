@@ -7,15 +7,23 @@ import { GlobalSearch } from "./GlobalSearch";
 
 export function Topbar({ onMenu }: { onMenu: () => void }) {
   const { db } = useStore();
-  const { configured, signOut } = useAuth();
+  const { configured, signOut, session } = useAuth();
   const owner = db.users.find((u) => u.role === "Owner") ?? db.users[0];
   const active =
     db.users.find((u) => `${u.name} (${u.role})` === db.user.trim()) ?? owner;
-  const initials = active?.name
+  // Data toko belum termuat dari Supabase: tetap tampilkan akun yang login.
+  const self = session?.user;
+  const selfName =
+    (self?.user_metadata as { name?: string } | undefined)?.name?.trim() ||
+    self?.email ||
+    "";
+  const displayName = active?.name || selfName || "Belum ada pengguna";
+  const initials = (active?.name ?? selfName)
     .split(" ")
     .map((x) => x[0])
     .join("")
-    .slice(0, 2);
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <header className="top">
@@ -48,7 +56,7 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
           <div className="tb-av">{initials}</div>
           <div className="tb-tx">
             <div className="tb-hi">Selamat datang,</div>
-            <div className="tb-nm">{active?.name ?? "Belum ada pengguna"}</div>
+            <div className="tb-nm">{displayName}</div>
           </div>
         </div>
 
