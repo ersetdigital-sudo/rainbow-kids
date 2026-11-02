@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { emptyDb } from "@/lib/seed";
+import { emptyDb } from "@/lib/workspace";
 import type { AppUser, DB } from "@/lib/types";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

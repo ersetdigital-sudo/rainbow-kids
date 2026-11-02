@@ -1,5 +1,5 @@
 import { queueRemoteSave } from "./remote";
-import { DEFAULT_PERMS, emptyDb, seed } from "./seed";
+import { DEFAULT_PERMS, emptyDb } from "./workspace";
 import type { DB, Role } from "./types";
 
 const KEY = "rk_data_v3";
@@ -111,9 +111,4 @@ export function setSnapshot(next: DB | ((prev: DB) => DB)) {
 /** Hapus semua data dan mulai dari nol (siap diisi data asli). */
 export function clearSnapshot() {
   persist(emptyDb());
-}
-
-/** Isi kembali data contoh untuk mencoba fitur. */
-export function loadDemoSnapshot() {
-  persist(seed());
 }

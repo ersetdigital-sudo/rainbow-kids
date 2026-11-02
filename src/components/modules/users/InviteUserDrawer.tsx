@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { getSupabase } from "@/lib/supabase";
 import { useStore } from "@/lib/store";
 import { Drawer } from "@/components/ui/Drawer";
 import type { Role } from "@/lib/types";
@@ -40,36 +39,15 @@ export function InviteUserDrawer({
       return setError("Password minimal 6 karakter");
     }
 
-    // Supabase aktif: buat akun login (email + password) lebih dulu.
-    if (configured) {
-      setBusy(true);
-      const { data } = (await getSupabase()?.auth.getSession()) ?? {
-        data: { session: null },
-      };
-      const res = await fetch("/api/users", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${data.session?.access_token ?? ""}`,
-        },
-        body: JSON.stringify({
-          name: cleanName,
-          email: cleanEmail,
-          role,
-          password,
-        }),
-      });
-      const json = (await res.json().catch(() => null)) as
-        | { ok: boolean; msg?: string }
-        | null;
-      setBusy(false);
-      if (!json?.ok) {
-        setError(json?.msg || "Gagal membuat akun");
-        return;
-      }
-    }
-
-    const result = inviteUser({ name: cleanName, email: cleanEmail, role });
+    // Supabase aktif: akun login (email + password) dibuat di Supabase Auth.
+    setBusy(true);
+    const result = await inviteUser({
+      name: cleanName,
+      email: cleanEmail,
+      role,
+      password,
+    });
+    setBusy(false);
     toast(result.msg);
     if (!result.ok) {
       setError(result.msg);

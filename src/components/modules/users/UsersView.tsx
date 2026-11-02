@@ -71,8 +71,8 @@ export function UsersView() {
           value={u.role}
           disabled={u.role === "Owner"}
           onChange={(e) => {
-            setUserRole(i, e.target.value as Role);
-            toast("Role diperbarui");
+            const next = e.target.value as Role;
+            setUserRole(i, next).then((res) => toast(res.msg));
           }}
         >
           {(["Owner", "Admin", "Approver", "User"] as Role[]).map((r) => (
@@ -89,7 +89,9 @@ export function UsersView() {
       render: (u, i) => (
         <button
           type="button"
-          onClick={() => toggleUser(i)}
+          onClick={() => {
+            toggleUser(i).then((res) => toast(res.msg));
+          }}
           className={`bd ${u.active ? "b-ok" : "b-in"}`}
         >
           {u.active ? "Aktif" : "Nonaktif"}

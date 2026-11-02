@@ -14,7 +14,8 @@ import { TODAY, nowStamp } from "./date";
 import { fetchRemoteState, setRemoteErrorHandler } from "./remote";
 import { uid } from "./format";
 import { monthCode, nextId } from "./ids";
-import { emptyDb } from "./seed";
+import { emptyDb } from "./workspace";
+import { createAccount, fetchAccounts, patchAccount } from "./users";
 import {
   customerStatus,
   overdueSales,
@@ -29,7 +30,6 @@ import {
   activateBrowserSnapshot,
   getServerSnapshot,
   getSnapshot,
-  loadDemoSnapshot,
   clearSnapshot,
   setSnapshot,
   subscribe,
@@ -138,37 +138,46 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Supabase aktif: setelah masuk, pakai data toko bersama dari server.
+  // Daftar pengguna selalu diambil dari akun Supabase Auth, bukan dari kode.
   useEffect(() => {
     if (!configured || !ready || !session) return;
     let cancelled = false;
-    fetchRemoteState().then((res) => {
-      // Gagal baca (mis. tabel app_state belum dibuat): biarkan data lokal.
-      if (cancelled || !res.ok) return;
+    Promise.all([fetchRemoteState(), fetchAccounts()]).then(
+      ([res, accounts]) => {
+        // Gagal baca (mis. tabel app_state belum dibuat): biarkan data lokal.
+        if (cancelled || !res.ok) return;
 
-      const email = (session.user.email ?? "").trim();
-      const meta = (session.user.user_metadata ?? {}) as {
-        name?: string;
-        role?: string;
-      };
-      const name = (meta.name ?? "").trim() || email.split("@")[0] || email;
-      const role = (ROLES.includes(meta.role ?? "") ? meta.role : "User") as Role;
-
-      setSnapshot(() => {
-        // Baris kosong = toko baru: mulai dari ruang kerja kosong, bukan
-        // sisa data contoh di browser ini.
-        const base = res.state ?? emptyDb();
-        const me = base.users.find(
-          (u) => u.email.toLowerCase() === email.toLowerCase(),
-        );
-        if (me) return { ...base, user: `${me.name} (${me.role})` };
-        // Akun login ini belum tercatat (mis. data dikosongkan) — catat ulang.
-        return {
-          ...base,
-          users: [...base.users, { name, email, role, active: true }],
-          user: `${name} (${role})`,
+        const email = (session.user.email ?? "").trim();
+        const meta = (session.user.user_metadata ?? {}) as {
+          name?: string;
+          role?: string;
         };
-      });
-    });
+        const account = accounts?.find(
+          (a) => a.email.toLowerCase() === email.toLowerCase(),
+        );
+        const name =
+          (account?.name || meta.name || "").trim() ||
+          email.split("@")[0] ||
+          email;
+        const role = (account?.role ??
+          (ROLES.includes(meta.role ?? "") ? meta.role : "User")) as Role;
+
+        setSnapshot(() => {
+          // Baris kosong = toko baru: mulai dari ruang kerja kosong.
+          const base = res.state ?? emptyDb();
+          const users = accounts ?? base.users;
+          const me = users.find(
+            (u) => u.email.toLowerCase() === email.toLowerCase(),
+          );
+          return {
+            ...base,
+            // Akun login ini belum tercatat (mis. baris data dikosongkan).
+            users: me ? users : [...users, { name, email, role, active: true }],
+            user: `${(me ?? { name, role }).name} (${(me ?? { name, role }).role})`,
+          };
+        });
+      },
+    );
     return () => {
       cancelled = true;
     };
@@ -199,12 +208,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const clearData = useCallback(() => {
     clearSnapshot();
     toast("Semua data dikosongkan");
-  }, [toast]);
-
-  /** Muat kembali data contoh untuk mencoba fitur. */
-  const loadDemo = useCallback(() => {
-    loadDemoSnapshot();
-    toast("Data contoh dimuat");
   }, [toast]);
 
   /* ---------------- Data toko ---------------- */
@@ -1673,75 +1676,142 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   /* ---------------- Pengguna ---------------- */
 
-  const setUserRole = useCallback<StoreValue["setUserRole"]>((index, role) => {
-    setSnapshot((prev) => ({
-      ...prev,
-      users: prev.users.map((u, i) => (i === index ? { ...u, role } : u)),
-    }));
-  }, []);
+  /**
+   * Perubahan pengguna disimpan ke akun Supabase Auth lebih dulu, baru
+   * dicatat di data toko — jadi role & status login selalu sama dengan
+   * yang berlaku di Supabase.
+   */
+  const setUserRole = useCallback<StoreValue["setUserRole"]>(
+    async (index, role) => {
+      const user = getSnapshot().users[index];
+      if (!user) return { ok: false, msg: "Pengguna tidak ditemukan" };
+      if (user.role === "Owner")
+        return { ok: false, msg: "Role Owner tidak bisa diubah" };
 
-  const toggleUser = useCallback<StoreValue["toggleUser"]>((index) => {
-    setSnapshot((prev) => ({
-      ...prev,
-      users: prev.users.map((u, i) =>
-        i === index ? { ...u, active: !u.active } : u,
-      ),
-    }));
-  }, []);
+      if (configured) {
+        const res = await patchAccount({ email: user.email, role });
+        if (!res.ok) return res;
+      }
 
-  const inviteUser = useCallback<StoreValue["inviteUser"]>((u) => {
-    const name = u.name.trim();
-    const email = u.email.trim();
-    if (!name) return { ok: false, msg: "Isi nama" };
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-      return { ok: false, msg: "Format email tidak valid" };
-    const current = getSnapshot();
-    if (current.users.some((x) => x.email.toLowerCase() === email.toLowerCase()))
-      return { ok: false, msg: "Email itu sudah dipakai pengguna lain" };
+      setSnapshot((prev) => ({
+        ...prev,
+        users: prev.users.map((u, i) => (i === index ? { ...u, role } : u)),
+      }));
+      return { ok: true, msg: "Role diperbarui" };
+    },
+    [configured],
+  );
 
-    setSnapshot((prev) => ({
-      ...prev,
-      users: [...prev.users, { name, email, role: u.role, active: true }],
-      // Pengguna pertama yang dibuat menjadi penanda pengguna aktif.
-      user: prev.user || (u.role === "Owner" ? `${name} (Owner)` : prev.user),
-    }));
-    return { ok: true, msg: "Pengguna ditambahkan" };
-  }, []);
+  const toggleUser = useCallback<StoreValue["toggleUser"]>(
+    async (index) => {
+      const user = getSnapshot().users[index];
+      if (!user) return { ok: false, msg: "Pengguna tidak ditemukan" };
+      const active = !user.active;
+
+      if (configured) {
+        const res = await patchAccount({ email: user.email, active });
+        if (!res.ok) return res;
+      }
+
+      setSnapshot((prev) => ({
+        ...prev,
+        users: prev.users.map((u, i) =>
+          i === index ? { ...u, active } : u,
+        ),
+      }));
+      return {
+        ok: true,
+        msg: active ? "Pengguna diaktifkan" : "Pengguna dinonaktifkan",
+      };
+    },
+    [configured],
+  );
+
+  const inviteUser = useCallback<StoreValue["inviteUser"]>(
+    async (u) => {
+      const name = u.name.trim();
+      const email = u.email.trim().toLowerCase();
+      if (!name) return { ok: false, msg: "Isi nama" };
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+        return { ok: false, msg: "Format email tidak valid" };
+      const current = getSnapshot();
+      if (
+        current.users.some((x) => x.email.toLowerCase() === email.toLowerCase())
+      )
+        return { ok: false, msg: "Email itu sudah dipakai pengguna lain" };
+
+      // Supabase aktif: akun login dibuat di Supabase Auth.
+      if (configured) {
+        if (u.password.length < 6)
+          return { ok: false, msg: "Password minimal 6 karakter" };
+        const res = await createAccount({
+          name,
+          email,
+          role: u.role,
+          password: u.password,
+        });
+        if (!res.ok) return res;
+      }
+
+      setSnapshot((prev) => ({
+        ...prev,
+        users: [...prev.users, { name, email, role: u.role, active: true }],
+        // Pengguna pertama yang dibuat menjadi penanda pengguna aktif.
+        user: prev.user || (u.role === "Owner" ? `${name} (Owner)` : prev.user),
+      }));
+      return { ok: true, msg: "Pengguna ditambahkan" };
+    },
+    [configured],
+  );
 
   /** Ubah nama, email, dan role pengguna. Role Owner tidak bisa diturunkan. */
-  const updateUser = useCallback<StoreValue["updateUser"]>((index, patch) => {
-    const name = patch.name.trim();
-    const email = patch.email.trim();
-    if (!name) return { ok: false, msg: "Isi nama pengguna" };
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-      return { ok: false, msg: "Format email tidak valid" };
+  const updateUser = useCallback<StoreValue["updateUser"]>(
+    async (index, patch) => {
+      const name = patch.name.trim();
+      const email = patch.email.trim().toLowerCase();
+      if (!name) return { ok: false, msg: "Isi nama pengguna" };
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+        return { ok: false, msg: "Format email tidak valid" };
 
-    const current = getSnapshot();
-    const user = current.users[index];
-    if (!user) return { ok: false, msg: "Pengguna tidak ditemukan" };
-    if (
-      current.users.some(
-        (u, i) => i !== index && u.email.toLowerCase() === email.toLowerCase(),
+      const current = getSnapshot();
+      const user = current.users[index];
+      if (!user) return { ok: false, msg: "Pengguna tidak ditemukan" };
+      if (
+        current.users.some(
+          (u, i) => i !== index && u.email.toLowerCase() === email.toLowerCase(),
+        )
       )
-    )
-      return { ok: false, msg: "Email itu sudah dipakai pengguna lain" };
-    if (user.role === "Owner" && patch.role !== "Owner")
-      return { ok: false, msg: "Role Owner tidak bisa diubah" };
+        return { ok: false, msg: "Email itu sudah dipakai pengguna lain" };
+      if (user.role === "Owner" && patch.role !== "Owner")
+        return { ok: false, msg: "Role Owner tidak bisa diubah" };
 
-    const role = user.role === "Owner" ? "Owner" : patch.role;
-    const wasActive = isActiveUser(current.user, user);
+      const role = user.role === "Owner" ? "Owner" : patch.role;
 
-    setSnapshot((prev) => ({
-      ...prev,
-      users: prev.users.map((u, i) =>
-        i === index ? { ...u, name, email, role } : u,
-      ),
-      // Hanya penanda pengguna aktif yang mengikuti nama baru;
-      // riwayat approval/opname lama tetap memakai nama saat kejadian.
-      user: wasActive ? `${name} (${role})` : prev.user,
-    }));
-    return { ok: true, msg: "Data pengguna diperbarui" };
-  }, []);
+      if (configured) {
+        const res = await patchAccount({
+          email: user.email,
+          name,
+          newEmail: email,
+          role,
+        });
+        if (!res.ok) return res;
+      }
+
+      const wasActive = isActiveUser(current.user, user);
+
+      setSnapshot((prev) => ({
+        ...prev,
+        users: prev.users.map((u, i) =>
+          i === index ? { ...u, name, email, role } : u,
+        ),
+        // Hanya penanda pengguna aktif yang mengikuti nama baru;
+        // riwayat approval/opname lama tetap memakai nama saat kejadian.
+        user: wasActive ? `${name} (${role})` : prev.user,
+      }));
+      return { ok: true, msg: "Data pengguna diperbarui" };
+    },
+    [configured],
+  );
 
   const cyclePerm = useCallback<StoreValue["cyclePerm"]>((role, module) => {
     setSnapshot((prev) => {
@@ -1763,7 +1833,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       db,
       toast,
       clearData,
-      loadDemo,
       updateBiz,
       addCustomer,
       requestCustomerEdit,
@@ -1793,7 +1862,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       db,
       toast,
       clearData,
-      loadDemo,
       updateBiz,
       addCustomer,
       requestCustomerEdit,
@@ -1840,7 +1908,6 @@ type StoreValue = {
   db: DB;
   toast: (msg: string) => void;
   clearData: () => void;
-  loadDemo: () => void;
   updateBiz: (patch: Biz) => Result;
   addCustomer: (c: {
     name: string;
@@ -1892,13 +1959,18 @@ type StoreValue = {
   submitOpname: (id: string) => Result;
   decideOpname: (id: string, ok: boolean) => void;
   decideApproval: (id: string, ok: boolean) => void;
-  setUserRole: (index: number, role: Role) => void;
-  toggleUser: (index: number) => void;
-  inviteUser: (u: { name: string; email: string; role: Role }) => Result;
+  setUserRole: (index: number, role: Role) => Promise<Result>;
+  toggleUser: (index: number) => Promise<Result>;
+  inviteUser: (u: {
+    name: string;
+    email: string;
+    role: Role;
+    password: string;
+  }) => Promise<Result>;
   updateUser: (
     index: number,
     patch: { name: string; email: string; role: Role },
-  ) => Result;
+  ) => Promise<Result>;
   cyclePerm: (role: Role, module: ModuleKey) => void;
 };
 

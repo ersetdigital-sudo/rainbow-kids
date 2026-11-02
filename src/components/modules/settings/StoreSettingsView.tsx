@@ -10,12 +10,12 @@ import type { Biz } from "@/lib/types";
 
 /** Kelola identitas toko yang tercetak di kepala invoice. */
 export function StoreSettingsView() {
-  const { db, updateBiz, clearData, loadDemo, toast } = useStore();
+  const { db, updateBiz, clearData, toast } = useStore();
   const { configured } = useAuth();
   const [form, setForm] = useState<Biz>(db.biz);
 
   // Ikuti data toko terbaru setelah dikosongkan atau dimuat ulang.
-  const [confirm, setConfirm] = useState<"demo" | "clear" | null>(null);
+  const [confirm, setConfirm] = useState<"clear" | null>(null);
   const [lastBiz, setLastBiz] = useState(db.biz);
   if (db.biz !== lastBiz) {
     setLastBiz(db.biz);
@@ -172,16 +172,6 @@ export function StoreSettingsView() {
             : "Data tersimpan di browser ini."}
         </p>
         <div className="flex flex-wrap gap-2">
-          {/* Data contoh hanya untuk mode lokal — jangan dicampur ke data asli. */}
-          {!configured && (
-            <button
-              type="button"
-              className="btn"
-              onClick={() => setConfirm("demo")}
-            >
-              Muat data contoh
-            </button>
-          )}
           <button
             type="button"
             className="btn d"
@@ -192,14 +182,6 @@ export function StoreSettingsView() {
         </div>
       </div>
 
-      <ConfirmDialog
-        open={confirm === "demo"}
-        onClose={() => setConfirm(null)}
-        title="Muat data contoh?"
-        description="Data yang ada sekarang akan diganti dengan data contoh."
-        confirmLabel="Muat data contoh"
-        onConfirm={loadDemo}
-      />
       <ConfirmDialog
         open={confirm === "clear"}
         onClose={() => setConfirm(null)}

@@ -39,7 +39,7 @@ src/
 ├── app/                    # App Router
 │   ├── layout.tsx          # font, metadata global, provider + shell
 │   ├── globals.css         # token desain (Tailwind v4 @theme) + komponen kustom
-│   ├── page.tsx            # Dashboard (+ JSON-LD LocalBusiness)
+│   ├── page.tsx            # Dashboard
 │   ├── sales/ ar/ stock/ purchases/ opname/ reports/ approvals/ users/ invoice/
 │   ├── invoice/[id]/       # invoice per transaksi (+ generateMetadata)
 │   ├── sitemap.ts robots.ts not-found.tsx
@@ -50,7 +50,8 @@ src/
 │   └── modules/            # view per fitur (dashboard, sales, ar, stock, ...)
 ├── lib/
 │   ├── types.ts            # tipe domain
-│   ├── seed.ts             # data demo deterministik
+│   ├── workspace.ts        # ruang kerja kosong + hak akses bawaan
+│   ├── users.ts            # daftar & ubah akun pengguna (Supabase Auth)
 │   ├── calc.ts             # helper laba/piutang
 │   ├── date.ts format.ts   # util tanggal & rupiah
 │   ├── persist.ts          # external store (localStorage) untuk useSyncExternalStore
@@ -59,16 +60,21 @@ src/
 legacy/                     # HTML & CSS asli (referensi, tidak dipakai runtime)
 ```
 
-## Yang perlu diisi manual
+## Data aplikasi
 
-Semua data berasal dari mockup, jadi nilai berikut **placeholder** dan perlu diganti:
+Tidak ada data toko di dalam kode: seluruh data (identitas toko, produk, pelanggan,
+transaksi, stok opname, approval, hak akses) tersimpan di Supabase — satu baris
+jsonb `public.app_state` (`supabase/schema.sql`). Daftar pengguna dan role-nya
+adalah akun Supabase Auth yang sebenarnya (`GET/POST/PATCH /api/users`).
 
-| Item | Nilai sekarang | Lokasi |
+| Item | Diisi dari | Tersimpan di |
 | --- | --- | --- |
-| Identitas bisnis (nama, alamat, HP, email, NPWP, rekening) | `Rainbow Kids`, Jl. Pelangi Raya, 0812-2233-4455, halo@rainbowkids.id, NPWP 01.234.567.8-423.000, BCA 123-456-7890 | `src/lib/seed.ts` (`biz`) |
-| Tanggal acuan demo (`TODAY`) | `2026-10-20` | `src/lib/date.ts` |
-| User & role (Budi/Rina/Dimas/Sari) | data dummy | `src/lib/seed.ts` (`users`, `perms`) |
-| Produk, pelanggan, transaksi | data dummy 40 hari | `src/lib/seed.ts` |
+| Identitas toko (nama, alamat, HP, email, NPWP, rekening) | Pengaturan Toko | `app_state` (`biz`) |
+| Pengguna, role, status aktif | Pengguna & Hak Akses | Supabase Auth (`user_metadata.role`, ban = nonaktif) |
+| Produk, pelanggan, supplier, transaksi, opname, approval | menu masing-masing | `app_state` |
+
+Sisa nilai branding yang masih di kode hanya teks identitas aplikasi (judul
+halaman/metadata SEO `Rainbow Kids`), bukan data toko.
 | Kontak WhatsApp / tautan sosial | tidak ada di HTML asli | belum ada — tambahkan di `src/components/layout/Topbar.tsx` |
 | Logo & gambar produk | tidak ada di HTML asli (semua ikon SVG inline) | `public/` |
 | Placeholder foto invoice | tidak ada | `src/components/modules/invoice/InvoiceView.tsx` |

@@ -21,6 +21,7 @@ const AUTH_ERRORS: Record<string, string> = {
   "User not found": "Email atau password salah",
   "Email not confirmed": "Email belum dikonfirmasi. Cek kotak masuk email.",
   "Email rate limit exceeded": "Terlalu banyak percobaan masuk. Coba lagi nanti.",
+  "User is banned": "Akun ini dinonaktifkan Owner. Hubungi Owner toko.",
   "Too many requests": "Terlalu banyak percobaan masuk. Coba lagi nanti.",
 };
 

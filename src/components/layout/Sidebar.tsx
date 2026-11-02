@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/lib/auth";
 import { NAV } from "@/lib/nav";
 import { useStore } from "@/lib/store";
 import { Icon } from "@/components/ui/Icon";
@@ -17,6 +18,7 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const { db } = useStore();
+  const { configured } = useAuth();
   const pending = db.approvals.filter((a) => a.status === "Menunggu").length;
 
   const isActive = (href: string) =>
@@ -80,7 +82,9 @@ export function Sidebar({
       </nav>
 
       <div className="side-ft">
-        <div className="side-note">Data tersimpan di browser ini</div>
+        <div className="side-note">
+          {configured ? "Data tersimpan di Supabase" : "Data tersimpan di browser ini"}
+        </div>
         <Link href="/settings" onClick={onClose} className="side-reset">
           Atur data toko
         </Link>
