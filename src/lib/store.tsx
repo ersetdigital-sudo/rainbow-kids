@@ -11,9 +11,10 @@ import {
 } from "react";
 import { useAuth } from "./auth";
 import { TODAY, nowStamp } from "./date";
-import { fetchRemoteState } from "./remote";
+import { fetchRemoteState, setRemoteErrorHandler } from "./remote";
 import { uid } from "./format";
 import { monthCode, nextId } from "./ids";
+import { emptyDb } from "./seed";
 import {
   customerStatus,
   overdueSales,
@@ -93,6 +94,8 @@ export type Result = {
 
 const PERM_LEVELS = ["Tidak", "Lihat", "Input", "Ajukan", "Penuh", "Setujui"];
 
+const ROLES = ["Owner", "Admin", "Approver", "User"];
+
 /**
  * Apakah `db.user` (mis. "Budi (Owner)") merujuk ke pengguna ini.
  * Data lama menyimpan nama depan saja, jadi nama depan juga dicocokkan.
@@ -138,15 +141,32 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!configured || !ready || !session) return;
     let cancelled = false;
-    fetchRemoteState().then((remote) => {
-      if (cancelled || !remote) return;
-      const email = session.user.email ?? "";
-      const me = remote.users.find(
-        (u) => u.email.toLowerCase() === email.toLowerCase(),
-      );
-      setSnapshot({
-        ...remote,
-        user: me ? `${me.name} (${me.role})` : email,
+    fetchRemoteState().then((res) => {
+      // Gagal baca (mis. tabel app_state belum dibuat): biarkan data lokal.
+      if (cancelled || !res.ok) return;
+
+      const email = (session.user.email ?? "").trim();
+      const meta = (session.user.user_metadata ?? {}) as {
+        name?: string;
+        role?: string;
+      };
+      const name = (meta.name ?? "").trim() || email.split("@")[0] || email;
+      const role = (ROLES.includes(meta.role ?? "") ? meta.role : "User") as Role;
+
+      setSnapshot(() => {
+        // Baris kosong = toko baru: mulai dari ruang kerja kosong, bukan
+        // sisa data contoh di browser ini.
+        const base = res.state ?? emptyDb();
+        const me = base.users.find(
+          (u) => u.email.toLowerCase() === email.toLowerCase(),
+        );
+        if (me) return { ...base, user: `${me.name} (${me.role})` };
+        // Akun login ini belum tercatat (mis. data dikosongkan) — catat ulang.
+        return {
+          ...base,
+          users: [...base.users, { name, email, role, active: true }],
+          user: `${name} (${role})`,
+        };
       });
     });
     return () => {
@@ -162,6 +182,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       2400,
     );
   }, []);
+
+  // Data asli tidak boleh hilang diam-diam: beri tahu bila penyimpanan ke
+  // Supabase gagal (mis. tabel app_state belum dibuat).
+  useEffect(() => {
+    const seen = new Set<string>();
+    setRemoteErrorHandler((msg) => {
+      if (seen.has(msg)) return;
+      seen.add(msg);
+      toast("Gagal menyimpan ke Supabase — periksa supabase/schema.sql");
+    });
+    return () => setRemoteErrorHandler(null);
+  }, [toast]);
 
   /** Hapus semua data supaya toko bisa mulai dengan data aslinya. */
   const clearData = useCallback(() => {

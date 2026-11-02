@@ -13,16 +13,27 @@ function adminClient() {
   });
 }
 
-/** Apakah project masih belum punya akun sama sekali? */
+/**
+ * Status project: apakah masih belum punya akun, dan apakah tabel
+ * `app_state` sudah dibuat lewat supabase/schema.sql.
+ */
 export async function GET() {
   const admin = adminClient();
-  if (!admin) return Response.json({ needsOwner: false });
+  if (!admin) return Response.json({ needsOwner: false, tableReady: false });
+
   const { data, error } = await admin.auth.admin.listUsers({
     page: 1,
     perPage: 1,
   });
-  if (error) return Response.json({ needsOwner: false });
-  return Response.json({ needsOwner: (data.users?.length ?? 0) === 0 });
+  const { error: tableError } = await admin
+    .from("app_state")
+    .select("id")
+    .limit(1);
+
+  return Response.json({
+    needsOwner: !error && (data.users?.length ?? 0) === 0,
+    tableReady: !tableError,
+  });
 }
 
 /** Buat akun Owner pertama (hanya bisa sekali, saat belum ada akun). */

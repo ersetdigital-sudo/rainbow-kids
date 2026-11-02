@@ -7,10 +7,30 @@ const ROW_ID = 1;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let pending: DB | null = null;
 
-/** Ambil state toko dari Supabase. Null bila belum ada atau gagal. */
-export async function fetchRemoteState(): Promise<DB | null> {
+/** Dipakai UI untuk memberi tahu bahwa penyimpanan ke Supabase gagal. */
+let errorHandler: ((msg: string) => void) | null = null;
+
+export function setRemoteErrorHandler(fn: ((msg: string) => void) | null) {
+  errorHandler = fn;
+}
+
+function reportError(message: string) {
+  console.error("Supabase:", message);
+  errorHandler?.(message);
+}
+
+/**
+ * Hasil baca state toko: `state` null berarti baris belum ada (toko baru),
+ * sedangkan `ok: false` berarti baca gagal (tabel belum dibuat / jaringan).
+ */
+export type RemoteStateResult =
+  | { ok: true; state: DB | null }
+  | { ok: false };
+
+/** Ambil state toko dari Supabase. */
+export async function fetchRemoteState(): Promise<RemoteStateResult> {
   const supabase = getSupabase();
-  if (!supabase) return null;
+  if (!supabase) return { ok: false };
 
   const { data, error } = await supabase
     .from("app_state")
@@ -19,12 +39,15 @@ export async function fetchRemoteState(): Promise<DB | null> {
     .maybeSingle();
 
   if (error) {
-    console.error("Gagal memuat data Supabase:", error.message);
-    return null;
+    reportError(error.message);
+    return { ok: false };
   }
 
   const state = data?.data as DB | undefined;
-  return state && Array.isArray(state.products) ? state : null;
+  return {
+    ok: true,
+    state: state && Array.isArray(state.products) ? state : null,
+  };
 }
 
 /**
@@ -47,6 +70,6 @@ export function queueRemoteSave(state: DB) {
     const { error } = await supabase
       .from("app_state")
       .upsert({ id: ROW_ID, data: next, updated_at: new Date().toISOString() });
-    if (error) console.error("Gagal menyimpan ke Supabase:", error.message);
+    if (error) reportError(error.message);
   }, 500);
 }

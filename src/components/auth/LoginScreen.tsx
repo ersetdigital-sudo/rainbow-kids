@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth";
 export function LoginScreen() {
   const { signIn } = useAuth();
   const [needsOwner, setNeedsOwner] = useState(false);
+  const [tableReady, setTableReady] = useState(true);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -18,8 +19,10 @@ export function LoginScreen() {
     let active = true;
     fetch("/api/bootstrap")
       .then((r) => r.json())
-      .then((json: { needsOwner?: boolean }) => {
-        if (active && json?.needsOwner) setNeedsOwner(true);
+      .then((json: { needsOwner?: boolean; tableReady?: boolean }) => {
+        if (!active) return;
+        if (json?.needsOwner) setNeedsOwner(true);
+        if (json?.tableReady === false) setTableReady(false);
       })
       .catch(() => {
         /* tanpa Supabase, mode lokal dipakai */
@@ -79,6 +82,21 @@ export function LoginScreen() {
             ? "Toko ini belum punya akun. Buat akun Owner pertama."
             : "Gunakan email & password yang dibuat Owner."}
         </p>
+
+        {!tableReady && (
+          <div
+            className="text-[12px] mb-4 rounded-lg px-3 py-2"
+            style={{
+              background: "var(--wab)",
+              border: "1px solid #f6e4a6",
+              color: "var(--wa)",
+            }}
+          >
+            Tabel data di Supabase belum dibuat. Jalankan{" "}
+            <b>supabase/schema.sql</b> di SQL Editor Supabase dulu — tanpa itu
+            data toko tidak tersimpan.
+          </div>
+        )}
 
         {needsOwner && (
           <>
