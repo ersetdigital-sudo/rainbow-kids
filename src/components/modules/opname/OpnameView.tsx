@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { formatDate } from "@/lib/date";
 import { rp } from "@/lib/format";
-import { findVariant, opnameDiff } from "@/lib/calc";
+import { opnameSummary } from "@/lib/opname";
 import { useStore } from "@/lib/store";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { PageHead } from "@/components/ui/PageHead";
@@ -38,17 +38,14 @@ export function OpnameView() {
       key: "diff",
       label: "Item selisih",
       align: "right",
-      render: (o) => o.lines.filter((l) => l.phys !== "" && l.phys !== l.sys).length,
+      render: (o) => opnameSummary(db.products, o).diffCount,
     },
     {
       key: "value",
       label: "Nilai selisih",
       align: "right",
       render: (o) => {
-        const value = o.lines.reduce((a, l) => {
-          const v = findVariant(db, l.vid);
-          return a + opnameDiff(l) * (v?.cost ?? 0);
-        }, 0);
+        const value = opnameSummary(db.products, o).diffValue;
         return (
           <span className="num" style={{ color: value < 0 ? "var(--er)" : "inherit" }}>
             {rp(value)}
@@ -82,6 +79,11 @@ export function OpnameView() {
             type="button"
             className="btn p"
             onClick={() => {
+              // Tanpa produk tidak ada yang bisa dibandingkan.
+              if (!db.products.length) {
+                toast("Belum ada produk. Tambahkan produk dulu di Produk & Stok.");
+                return;
+              }
               const id = startOpname();
               toast("Sesi opname dibuat");
               setOpenId(id);

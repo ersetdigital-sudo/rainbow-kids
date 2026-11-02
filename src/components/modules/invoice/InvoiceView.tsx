@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- logo invoice dari Pengaturan Toko berupa data URL */
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -73,6 +74,9 @@ export function InvoiceView({ invoiceId }: { invoiceId?: string }) {
   // Rekening tujuan transfer selalu dari Pengaturan Toko (satu rekening
   // untuk semua invoice), tidak lagi per toko.
   const transferTo = b.bank;
+  // Logo & catatan kaki invoice berasal dari Pengaturan Toko.
+  const logo = db.prefs.logo;
+  const note = db.prefs.note.trim();
   const st = arStatus(sale);
   const statusStyle =
     st === "Lunas"
@@ -85,7 +89,7 @@ export function InvoiceView({ invoiceId }: { invoiceId?: string }) {
     <>
       <PageHead
         title="Invoice"
-        subtitle="Template A4 — akan disesuaikan dengan contoh invoice dari customer."
+        subtitle="Template A4 — logo, rekening, dan catatan kaki mengikuti Pengaturan Toko."
         actions={
           <>
             <select
@@ -129,21 +133,40 @@ export function InvoiceView({ invoiceId }: { invoiceId?: string }) {
             }}
           >
             <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-              <div
-                style={{
-                  width: 52,
-                  height: 52,
-                  borderRadius: 12,
-                  background: "#04123F",
-                  color: "#FEC40B",
-                  display: "grid",
-                  placeItems: "center",
-                  fontWeight: 800,
-                  fontSize: 20,
-                }}
-              >
-                RK
-              </div>
+              {logo ? (
+                <img
+                  src={logo}
+                  alt={`Logo ${b.name || "toko"}`}
+                  style={{
+                    width: 52,
+                    height: 52,
+                    objectFit: "contain",
+                    borderRadius: 12,
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: 12,
+                    background: "#04123F",
+                    color: "#FEC40B",
+                    display: "grid",
+                    placeItems: "center",
+                    fontWeight: 800,
+                    fontSize: 20,
+                  }}
+                >
+                  {(b.name || "TS")
+                    .split(/\s+/)
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map((w) => w[0])
+                    .join("")
+                    .toUpperCase()}
+                </div>
+              )}
               <div>
                 <div style={{ fontWeight: 800, fontSize: 17 }}>{b.name}</div>
                 <div style={{ color: "#555", lineHeight: 1.5 }}>
@@ -329,6 +352,21 @@ export function InvoiceView({ invoiceId }: { invoiceId?: string }) {
               </div>
             </div>
           </div>
+
+          {note ? (
+            <div
+              style={{
+                marginTop: 18,
+                borderTop: "1px solid #E6E8F0",
+                paddingTop: 10,
+                color: "#555",
+                fontSize: 10.5,
+                lineHeight: 1.6,
+              }}
+            >
+              {note}
+            </div>
+          ) : null}
         </div>
       </div>
 

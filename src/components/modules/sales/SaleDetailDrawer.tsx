@@ -50,7 +50,7 @@ export function SaleDetailDrawer({
   const [payOpen, setPayOpen] = useState(false);
   const [payDate, setPayDate] = useState(TODAY);
   const [payAmt, setPayAmt] = useState(0);
-  const [payMethod, setPayMethod] = useState("Transfer");
+  const [payMethod, setPayMethod] = useState(db.prefs.methods[0] ?? "Transfer");
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [tab, setTab] = useState<"ringkasan" | "barang" | "bayar">("ringkasan");
@@ -640,9 +640,9 @@ export function SaleDetailDrawer({
                         value={payMethod}
                         onChange={(e) => setPayMethod(e.target.value)}
                       >
-                        <option>Transfer</option>
-                        <option>Tunai</option>
-                        <option>QRIS</option>
+                        {db.prefs.methods.map((m) => (
+                          <option key={m}>{m}</option>
+                        ))}
                       </select>
                     </div>
                   </div>

@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { rp } from "@/lib/format";
 import { allV } from "@/lib/calc";
 import { useStore } from "@/lib/store";
 import { DataTable, type Column } from "@/components/ui/DataTable";
+import { downloadCsv, stamp } from "@/lib/export";
 import { PageHead } from "@/components/ui/PageHead";
 import type { FlatVariant } from "@/lib/calc";
 import {
@@ -12,6 +13,7 @@ import {
   ProductFormDrawer,
   VariantHistoryDrawer,
 } from "./StockDrawers";
+import { parseStockCsv, STOCK_TEMPLATE } from "./importStock";
 
 /** Inisial nama produk untuk avatar kartu varian. */
 const initials = (name: string) =>
@@ -23,16 +25,17 @@ const initials = (name: string) =>
     .join("")
     .toUpperCase();
 
-const stockTone = (stock: number) =>
-  stock < 0 ? "b-er" : stock < 15 ? "b-wa" : "b-ok";
+const stockTone = (stock: number, minStock: number) =>
+  stock < 0 ? "b-er" : stock < minStock ? "b-wa" : "b-ok";
 
 export function StockView() {
-  const { db } = useStore();
+  const { db, importProducts, toast } = useStore();
   const [cat, setCat] = useState("");
   const [query, setQuery] = useState("");
   const [historyId, setHistoryId] = useState<string | null>(null);
   const [changeId, setChangeId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const importRef = useRef<HTMLInputElement>(null);
 
   const cats = useMemo(
     () => [...new Set(db.products.map((p) => p.cat))],
@@ -40,6 +43,8 @@ export function StockView() {
   );
 
   const variants = useMemo(() => allV(db), [db]);
+
+  const minStock = db.prefs.minStock;
 
   const list = useMemo(() => {
     const filtered = variants.filter(
@@ -51,14 +56,16 @@ export function StockView() {
     // Stok minus & perlu restock didahulukan.
     return filtered.slice().sort((a, b) => {
       const rank = (v: FlatVariant) =>
-        v.stock < 0 ? 0 : v.stock === 0 ? 1 : v.stock < 15 ? 2 : 3;
+        v.stock < 0 ? 0 : v.stock === 0 ? 1 : v.stock < minStock ? 2 : 3;
       const d = rank(a) - rank(b);
       return d !== 0 ? d : a.pname.localeCompare(b.pname);
     });
-  }, [variants, cat, query]);
+  }, [variants, cat, query, minStock]);
 
   const minus = list.filter((v) => v.stock < 0);
-  const restock = list.filter((v) => v.stock >= 0 && v.stock < 15);
+  const restock = list.filter(
+    (v) => v.stock >= 0 && v.stock < db.prefs.minStock,
+  );
 
   const stockValue = variants.reduce(
     (x, v) => x + Math.max(v.stock, 0) * v.cost,
@@ -66,7 +73,9 @@ export function StockView() {
   );
   const stockUnits = variants.reduce((x, v) => x + Math.max(v.stock, 0), 0);
   const minusAll = variants.filter((v) => v.stock < 0).length;
-  const lowAll = variants.filter((v) => v.stock >= 0 && v.stock < 15).length;
+  const lowAll = variants.filter(
+    (v) => v.stock >= 0 && v.stock < db.prefs.minStock,
+  ).length;
 
   const countIn = (c: string) =>
     c ? variants.filter((v) => v.cat === c).length : variants.length;
@@ -97,7 +106,9 @@ export function StockView() {
       label: "Stok",
       align: "right",
       render: (v) => (
-        <span className={`bd num ${stockTone(v.stock)}`}>{v.stock}</span>
+        <span className={`bd num ${stockTone(v.stock, db.prefs.minStock)}`}>
+          {v.stock}
+        </span>
       ),
     },
     {
@@ -150,9 +161,60 @@ export function StockView() {
         title="Produk & Stok"
         subtitle="Kategori, produk, dan varian bebas diatur. Harga modal & rentang harga jual diubah lewat approval."
         actions={
-          <button type="button" className="btn p" onClick={() => setFormOpen(true)}>
-            + Produk baru
-          </button>
+          <>
+            <input
+              ref={importRef}
+              type="file"
+              accept=".csv,text/csv"
+              aria-label="berkas impor produk"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = () => {
+                  const { rows, skipped } = parseStockCsv(
+                    String(reader.result ?? ""),
+                  );
+                  const res = importProducts(rows);
+                  toast(
+                    res.ok && skipped
+                      ? `${res.msg}, ${skipped} baris dilewati`
+                      : res.msg,
+                  );
+                };
+                reader.readAsText(file);
+              }}
+            />
+            <button
+              type="button"
+              className="btn"
+              onClick={() =>
+                downloadCsv(
+                  `template-produk-${stamp()}`,
+                  STOCK_TEMPLATE[0],
+                  STOCK_TEMPLATE.slice(1),
+                )
+              }
+            >
+              Template CSV
+            </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => importRef.current?.click()}
+            >
+              Impor CSV
+            </button>
+            <button
+              type="button"
+              className="btn p"
+              onClick={() => setFormOpen(true)}
+            >
+              + Produk baru
+            </button>
+          </>
         }
       />
 
@@ -184,7 +246,7 @@ export function StockView() {
               <div className="v num">{minusAll}</div>
             </div>
             <div className={`st-tile${lowAll ? " warn" : ""}`}>
-              <div className="l">Menipis (&lt;15)</div>
+              <div className="l">Menipis (&lt;{minStock})</div>
               <div className="v num">{lowAll}</div>
             </div>
           </div>

@@ -9,9 +9,18 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { useAuth } from "./auth";
 import { TODAY, nowStamp } from "./date";
+import { fetchRemoteState, setRemoteErrorHandler } from "./remote";
 import { uid } from "./format";
 import { monthCode, nextId } from "./ids";
+import { DEFAULT_PERMS, DEFAULT_PREFS, emptyDb } from "./workspace";
+import {
+  createAccount,
+  fetchAccounts,
+  patchAccount,
+  removeAccount,
+} from "./users";
 import {
   customerStatus,
   overdueSales,
@@ -22,11 +31,12 @@ import {
   saleProposed,
   saleTotal,
 } from "./calc";
+import { compareOpname } from "./opname";
 import {
   activateBrowserSnapshot,
   getServerSnapshot,
   getSnapshot,
-  resetSnapshot,
+  clearSnapshot,
   setSnapshot,
   subscribe,
 } from "./persist";
@@ -40,6 +50,7 @@ import type {
   DB,
   ModuleKey,
   OpnameLine,
+  Prefs,
   PurchaseRequest,
   Role,
   Sale,
@@ -71,6 +82,15 @@ export type PurchaseDraft = {
   items: { vid: string; qty: number; cost: number }[];
 };
 
+export type ImportProductRow = {
+  cat: string;
+  name: string;
+  variant: string;
+  stock: number;
+  cost: number;
+  price: number;
+};
+
 export type VariantInput = {
   name: string;
   stock: number;
@@ -89,6 +109,8 @@ export type Result = {
 };
 
 const PERM_LEVELS = ["Tidak", "Lihat", "Input", "Ajukan", "Penuh", "Setujui"];
+
+const ROLES = ["Owner", "Admin", "Approver", "User"];
 
 /**
  * Apakah `db.user` (mis. "Budi (Owner)") merujuk ke pengguna ini.
@@ -121,7 +143,11 @@ const StoreContext = createContext<StoreValue | null>(null);
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const db = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const { configured, ready, session, signOut } = useAuth();
   const [toasts, setToasts] = useState<{ id: number; msg: string }[]>([]);
+  // Akun yang datanya sudah selesai dibaca dari Supabase. Selama belum sama
+  // dengan sesi aktif, UI menunggu supaya dashboard tidak tampil kosong dulu.
+  const [loadedUser, setLoadedUser] = useState<string | null>(null);
 
   // Data tersimpan di browser baru dipakai setelah hydration selesai, supaya
   // markup server & client sama dan tidak memicu hydration mismatch.
@@ -129,6 +155,59 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const timer = window.setTimeout(activateBrowserSnapshot, 0);
     return () => window.clearTimeout(timer);
   }, []);
+
+  // Supabase aktif: setelah masuk, pakai data toko bersama dari server.
+  // Daftar pengguna selalu diambil dari akun Supabase Auth, bukan dari kode.
+  useEffect(() => {
+    if (!configured || !ready || !session) return;
+    let cancelled = false;
+    Promise.all([fetchRemoteState(), fetchAccounts()]).then(
+      ([res, accounts]) => {
+        // Gagal baca (mis. supabase/schema.sql belum dijalankan): pakai data lokal.
+        if (cancelled || !res.ok) return;
+
+        const email = (session.user.email ?? "").trim();
+        const meta = (session.user.user_metadata ?? {}) as {
+          name?: string;
+          role?: string;
+        };
+        const account = accounts?.find(
+          (a) => a.email.toLowerCase() === email.toLowerCase(),
+        );
+        const name =
+          (account?.name || meta.name || "").trim() ||
+          email.split("@")[0] ||
+          email;
+        const role = (account?.role ??
+          (ROLES.includes(meta.role ?? "") ? meta.role : "User")) as Role;
+
+        setSnapshot(() => {
+          // Baris kosong = toko baru: mulai dari ruang kerja kosong.
+          const base = res.state ?? emptyDb();
+          const users = accounts ?? base.users;
+          const me = users.find(
+            (u) => u.email.toLowerCase() === email.toLowerCase(),
+          );
+          return {
+            ...base,
+            // Akun login ini belum tercatat (mis. baris data dikosongkan).
+            users: me ? users : [...users, { name, email, role, active: true }],
+            user: `${(me ?? { name, role }).name} (${(me ?? { name, role }).role})`,
+          };
+        });
+      },
+    ).finally(() => {
+      // Data toko siap (atau gagal dibaca → tetap pakai data lokal).
+      if (!cancelled) setLoadedUser(session.user.id);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [configured, ready, session]);
+
+  /** Dashboard baru boleh tampil setelah data toko akun ini selesai dimuat. */
+  const storeReady =
+    !configured || !session || loadedUser === session.user.id;
 
   const toast = useCallback((msg: string) => {
     const id = Date.now() + Math.random();
@@ -139,9 +218,22 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
-  const resetDemo = useCallback(() => {
-    resetSnapshot();
-    toast("Data demo direset");
+  // Data asli tidak boleh hilang diam-diam: beri tahu bila penyimpanan ke
+  // Simpan ke Supabase gagal (mis. supabase/schema.sql belum dijalankan).
+  useEffect(() => {
+    const seen = new Set<string>();
+    setRemoteErrorHandler((msg) => {
+      if (seen.has(msg)) return;
+      seen.add(msg);
+      toast("Gagal menyimpan ke Supabase — periksa supabase/schema.sql");
+    });
+    return () => setRemoteErrorHandler(null);
+  }, [toast]);
+
+  /** Hapus semua data supaya toko bisa mulai dengan data aslinya. */
+  const clearData = useCallback(() => {
+    clearSnapshot();
+    toast("Semua data dikosongkan");
   }, [toast]);
 
   /* ---------------- Data toko ---------------- */
@@ -165,6 +257,97 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         },
       }));
       return { ok: true, msg: "Data toko disimpan" };
+    },
+    [],
+  );
+
+  /** Pengaturan operasional toko: identitas cetak, tempo, ambang stok, metode bayar. */
+  const updatePrefs = useCallback<StoreValue["updatePrefs"]>(
+    (patch) => {
+      const methods = patch.methods.map((m) => m.trim()).filter(Boolean);
+      if (!methods.length)
+        return { ok: false, msg: "Isi minimal satu metode pembayaran" };
+      if (!Number.isFinite(patch.dueDays) || patch.dueDays < 0)
+        return { ok: false, msg: "Jatuh tempo harus berupa angka hari" };
+      if (!Number.isFinite(patch.minStock) || patch.minStock < 0)
+        return { ok: false, msg: "Ambang stok menipis harus berupa angka" };
+      setSnapshot((prev) => ({
+        ...prev,
+        prefs: {
+          ...prev.prefs,
+          ...patch,
+          methods,
+          dueDays: Math.round(patch.dueDays),
+          minStock: Math.round(patch.minStock),
+        },
+      }));
+      return { ok: true, msg: "Pengaturan toko disimpan" };
+    },
+    [],
+  );
+
+  /* ---------------- Biaya operasional ---------------- */
+
+  /** Catat pengeluaran di luar order (listrik, gaji, sewa, …). */
+  const addExpense = useCallback<StoreValue["addExpense"]>(
+    (e) => {
+      const cat = e.cat.trim();
+      if (!cat) return { ok: false, msg: "Isi kategori biaya" };
+      if (!(e.amt > 0)) return { ok: false, msg: "Jumlah biaya harus lebih dari 0" };
+      setSnapshot((prev) => ({
+        ...prev,
+        expenses: [...prev.expenses, { date: e.date, cat, amt: e.amt }],
+      }));
+      return { ok: true, msg: "Biaya dicatat" };
+    },
+    [],
+  );
+
+  const updateExpense = useCallback<StoreValue["updateExpense"]>(
+    (index, patch) => {
+      const current = getSnapshot().expenses[index];
+      if (!current) return { ok: false, msg: "Biaya tidak ditemukan" };
+      const cat = (patch.cat ?? current.cat).trim();
+      const amt = patch.amt ?? current.amt;
+      if (!cat) return { ok: false, msg: "Isi kategori biaya" };
+      if (!(amt > 0)) return { ok: false, msg: "Jumlah biaya harus lebih dari 0" };
+      setSnapshot((prev) => ({
+        ...prev,
+        expenses: prev.expenses.map((e, i) =>
+          i === index ? { date: patch.date ?? e.date, cat, amt } : e,
+        ),
+      }));
+      return { ok: true, msg: "Biaya diperbarui" };
+    },
+    [],
+  );
+
+  const removeExpense = useCallback<StoreValue["removeExpense"]>((index) => {
+    if (!getSnapshot().expenses[index])
+      return { ok: false, msg: "Biaya tidak ditemukan" };
+    setSnapshot((prev) => ({
+      ...prev,
+      expenses: prev.expenses.filter((_, i) => i !== index),
+    }));
+    return { ok: true, msg: "Biaya dihapus" };
+  }, []);
+
+  /* ---------------- Cadangan data ---------------- */
+
+  /** Pulihkan seluruh data toko dari berkas cadangan (akun login tidak diubah). */
+  const restoreData = useCallback<StoreValue["restoreData"]>(
+    (data) => {
+      if (!data || !Array.isArray(data.products))
+        return { ok: false, msg: "Berkas cadangan tidak dikenali" };
+      setSnapshot((prev) => ({
+        ...emptyDb(),
+        ...data,
+        users: prev.users,
+        user: prev.user,
+        prefs: { ...DEFAULT_PREFS, ...(data.prefs ?? {}) },
+        perms: { ...DEFAULT_PERMS, ...(data.perms ?? {}) },
+      }));
+      return { ok: true, msg: "Data toko dipulihkan dari cadangan" };
     },
     [],
   );
@@ -700,6 +883,60 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  /**
+   * Impor varian dari CSV/Excel. Satu baris = satu varian; baris dengan
+   * kategori + nama produk yang sama digabung jadi satu produk.
+   */
+  const importProducts = useCallback<StoreValue["importProducts"]>((rows) => {
+    const clean = rows.filter((r) => r.cat.trim() && r.name.trim());
+    if (!clean.length)
+      return { ok: false, msg: "Tidak ada baris valid (kategori & nama wajib)" };
+    setSnapshot((prev) => {
+      const products = prev.products.map((p) => ({
+        ...p,
+        variants: [...p.variants],
+      }));
+      for (const row of clean) {
+        const cat = row.cat.trim();
+        const name = row.name.trim();
+        const price = row.price > 0 ? row.price : 0;
+        let product = products.find((p) => p.cat === cat && p.name === name);
+        if (!product) {
+          product = {
+            id: uid("p"),
+            cat,
+            name,
+            minPrice: price,
+            maxPrice: price,
+            variants: [],
+          };
+          products.push(product);
+        }
+        product.minPrice = Math.min(product.minPrice || price, price);
+        product.maxPrice = Math.max(product.maxPrice, price);
+        const variantName = (row.variant || "Default").trim();
+        const existing = product.variants.find(
+          (v) => v.name.toLowerCase() === variantName.toLowerCase(),
+        );
+        if (existing) {
+          existing.stock = row.stock;
+          existing.cost = row.cost;
+          existing.price = price;
+        } else {
+          product.variants.push({
+            id: uid("v"),
+            name: variantName,
+            stock: row.stock,
+            cost: row.cost,
+            price,
+          });
+        }
+      }
+      return { ...prev, products };
+    });
+    return { ok: true, msg: `${clean.length} varian diimpor` };
+  }, []);
+
   /** Pengajuan ubah nama varian / harga modal / rentang harga jual. */
   const submitChange = useCallback<StoreValue["submitChange"]>(
     (vid, changes) => {
@@ -989,12 +1226,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const submitOpname = useCallback<StoreValue["submitOpname"]>(
     (id) => {
-      const o = getSnapshot().opnames.find((x) => x.id === id);
+      const current = getSnapshot();
+      const o = current.opnames.find((x) => x.id === id);
       if (!o) return { ok: false, msg: "Sesi opname tidak ditemukan" };
-      const missing = o.lines.some(
-        (l) => l.phys !== "" && l.phys !== l.sys && !l.note,
-      );
-      if (missing)
+      const cmp = compareOpname(current.products, o.lines);
+      if (!cmp.ready)
         return { ok: false, msg: "Isi penyebab untuk setiap selisih" };
       const submittedAt = nowStamp();
       setSnapshot((prev) => ({
@@ -1015,22 +1251,24 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setSnapshot((prev) => {
       const o = prev.opnames.find((x) => x.id === id);
       if (!o) return prev;
+      // Selisih dihitung terhadap stok terkini di tabel produk, bukan snapshot sesi.
+      const cmp = compareOpname(prev.products, o.lines);
+      const diffByVid = new Map(cmp.diffRows.map((r) => [r.vid, r]));
+      const sysByVid = new Map(cmp.rows.map((r) => [r.vid, r.sys]));
       const history = [...prev.history];
       const products = prev.products.map((p) => ({
         ...p,
         variants: p.variants.map((v) => {
-          const line = o.lines.find((l) => l.vid === v.id);
-          if (!ok || !line || line.phys === "" || line.phys === line.sys)
-            return v;
-          const d = line.phys - line.sys;
+          const row = diffByVid.get(v.id);
+          if (!ok || !row) return v;
           history.push({
             vid: v.id,
             date: TODAY,
             type: "Stok" as const,
-            desc: `Stok opname ${o.id}: ${d > 0 ? "+" : ""}${d} (${line.note})`,
+            desc: `Stok opname ${o.id}: ${row.diff > 0 ? "+" : ""}${row.diff} (${row.note})`,
             user: prev.user,
           });
-          return { ...v, stock: v.stock + d };
+          return { ...v, stock: v.stock + row.diff };
         }),
       }));
       return {
@@ -1039,7 +1277,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         history,
         opnames: prev.opnames.map((x) =>
           x.id === id
-            ? { ...x, status: ok ? "Disetujui" : "Ditolak", by: prev.user, decidedAt }
+            ? {
+                ...x,
+                // Simpan stok sistem yang dipakai saat selisih diputuskan.
+                lines: x.lines.map((l) => {
+                  const sys = sysByVid.get(l.vid);
+                  return sys === undefined ? l : { ...l, sys };
+                }),
+                status: ok ? "Disetujui" : "Ditolak",
+                by: prev.user,
+                decidedAt,
+              }
             : x,
         ),
       };
@@ -1610,65 +1858,177 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   /* ---------------- Pengguna ---------------- */
 
-  const setUserRole = useCallback<StoreValue["setUserRole"]>((index, role) => {
-    setSnapshot((prev) => ({
-      ...prev,
-      users: prev.users.map((u, i) => (i === index ? { ...u, role } : u)),
-    }));
-  }, []);
+  /**
+   * Perubahan pengguna disimpan ke akun Supabase Auth lebih dulu, baru
+   * dicatat di data toko — jadi role & status login selalu sama dengan
+   * yang berlaku di Supabase.
+   */
+  const setUserRole = useCallback<StoreValue["setUserRole"]>(
+    async (index, role) => {
+      const user = getSnapshot().users[index];
+      if (!user) return { ok: false, msg: "Pengguna tidak ditemukan" };
+      if (user.role === "Owner")
+        return { ok: false, msg: "Role Owner tidak bisa diubah" };
 
-  const toggleUser = useCallback<StoreValue["toggleUser"]>((index) => {
-    setSnapshot((prev) => ({
-      ...prev,
-      users: prev.users.map((u, i) =>
-        i === index ? { ...u, active: !u.active } : u,
-      ),
-    }));
-  }, []);
+      if (configured) {
+        const res = await patchAccount({ email: user.email, role });
+        if (!res.ok) return res;
+      }
 
-  const inviteUser = useCallback<StoreValue["inviteUser"]>((u) => {
-    if (!u.name.trim()) return { ok: false, msg: "Isi nama" };
-    setSnapshot((prev) => ({
-      ...prev,
-      users: [...prev.users, { ...u, name: u.name.trim(), active: true }],
-    }));
-    return { ok: true, msg: "Undangan disimulasikan" };
-  }, []);
+      setSnapshot((prev) => ({
+        ...prev,
+        users: prev.users.map((u, i) => (i === index ? { ...u, role } : u)),
+      }));
+      return { ok: true, msg: "Role diperbarui" };
+    },
+    [configured],
+  );
+
+  const toggleUser = useCallback<StoreValue["toggleUser"]>(
+    async (index) => {
+      const user = getSnapshot().users[index];
+      if (!user) return { ok: false, msg: "Pengguna tidak ditemukan" };
+      const active = !user.active;
+
+      if (configured) {
+        const res = await patchAccount({ email: user.email, active });
+        if (!res.ok) return res;
+      }
+
+      setSnapshot((prev) => ({
+        ...prev,
+        users: prev.users.map((u, i) =>
+          i === index ? { ...u, active } : u,
+        ),
+      }));
+      return {
+        ok: true,
+        msg: active ? "Pengguna diaktifkan" : "Pengguna dinonaktifkan",
+      };
+    },
+    [configured],
+  );
+
+  const inviteUser = useCallback<StoreValue["inviteUser"]>(
+    async (u) => {
+      const name = u.name.trim();
+      const email = u.email.trim().toLowerCase();
+      if (!name) return { ok: false, msg: "Isi nama" };
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+        return { ok: false, msg: "Format email tidak valid" };
+      const current = getSnapshot();
+      if (
+        current.users.some((x) => x.email.toLowerCase() === email.toLowerCase())
+      )
+        return { ok: false, msg: "Email itu sudah dipakai pengguna lain" };
+
+      // Supabase aktif: akun login dibuat di Supabase Auth.
+      if (configured) {
+        if (u.password.length < 6)
+          return { ok: false, msg: "Password minimal 6 karakter" };
+        const res = await createAccount({
+          name,
+          email,
+          role: u.role,
+          password: u.password,
+        });
+        if (!res.ok) return res;
+      }
+
+      setSnapshot((prev) => ({
+        ...prev,
+        users: [...prev.users, { name, email, role: u.role, active: true }],
+        // Pengguna pertama yang dibuat menjadi penanda pengguna aktif.
+        user: prev.user || (u.role === "Owner" ? `${name} (Owner)` : prev.user),
+      }));
+      return { ok: true, msg: "Pengguna ditambahkan" };
+    },
+    [configured],
+  );
 
   /** Ubah nama, email, dan role pengguna. Role Owner tidak bisa diturunkan. */
-  const updateUser = useCallback<StoreValue["updateUser"]>((index, patch) => {
-    const name = patch.name.trim();
-    const email = patch.email.trim();
-    if (!name) return { ok: false, msg: "Isi nama pengguna" };
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-      return { ok: false, msg: "Format email tidak valid" };
+  const updateUser = useCallback<StoreValue["updateUser"]>(
+    async (index, patch) => {
+      const name = patch.name.trim();
+      const email = patch.email.trim().toLowerCase();
+      if (!name) return { ok: false, msg: "Isi nama pengguna" };
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+        return { ok: false, msg: "Format email tidak valid" };
 
-    const current = getSnapshot();
-    const user = current.users[index];
-    if (!user) return { ok: false, msg: "Pengguna tidak ditemukan" };
-    if (
-      current.users.some(
-        (u, i) => i !== index && u.email.toLowerCase() === email.toLowerCase(),
+      const current = getSnapshot();
+      const user = current.users[index];
+      if (!user) return { ok: false, msg: "Pengguna tidak ditemukan" };
+      if (
+        current.users.some(
+          (u, i) => i !== index && u.email.toLowerCase() === email.toLowerCase(),
+        )
       )
-    )
-      return { ok: false, msg: "Email itu sudah dipakai pengguna lain" };
-    if (user.role === "Owner" && patch.role !== "Owner")
-      return { ok: false, msg: "Role Owner tidak bisa diubah" };
+        return { ok: false, msg: "Email itu sudah dipakai pengguna lain" };
+      if (user.role === "Owner" && patch.role !== "Owner")
+        return { ok: false, msg: "Role Owner tidak bisa diubah" };
 
-    const role = user.role === "Owner" ? "Owner" : patch.role;
-    const wasActive = isActiveUser(current.user, user);
+      const role = user.role === "Owner" ? "Owner" : patch.role;
 
-    setSnapshot((prev) => ({
-      ...prev,
-      users: prev.users.map((u, i) =>
-        i === index ? { ...u, name, email, role } : u,
-      ),
-      // Hanya penanda pengguna aktif yang mengikuti nama baru;
-      // riwayat approval/opname lama tetap memakai nama saat kejadian.
-      user: wasActive ? `${name} (${role})` : prev.user,
-    }));
-    return { ok: true, msg: "Data pengguna diperbarui" };
-  }, []);
+      if (configured) {
+        const res = await patchAccount({
+          email: user.email,
+          name,
+          newEmail: email,
+          role,
+        });
+        if (!res.ok) return res;
+      }
+
+      const wasActive = isActiveUser(current.user, user);
+
+      setSnapshot((prev) => ({
+        ...prev,
+        users: prev.users.map((u, i) =>
+          i === index ? { ...u, name, email, role } : u,
+        ),
+        // Hanya penanda pengguna aktif yang mengikuti nama baru;
+        // riwayat approval/opname lama tetap memakai nama saat kejadian.
+        user: wasActive ? `${name} (${role})` : prev.user,
+      }));
+      return { ok: true, msg: "Data pengguna diperbarui" };
+    },
+    [configured],
+  );
+
+  /**
+   * Hapus akun login. Akun di Supabase Auth dihapus lebih dulu; bila yang
+   * dihapus adalah akun yang sedang dipakai, sesi ikut dicabut (keluar).
+   * Bila akun terakhir dihapus, aplikasi kembali ke layar "Buat akun Owner".
+   */
+  const deleteUser = useCallback<StoreValue["deleteUser"]>(
+    async (index) => {
+      const current = getSnapshot();
+      const user = current.users[index];
+      if (!user) return { ok: false, msg: "Pengguna tidak ditemukan" };
+
+      if (configured) {
+        const res = await removeAccount(user.email);
+        if (!res.ok) return res;
+      }
+
+      const wasActive = isActiveUser(current.user, user);
+      setSnapshot((prev) => ({
+        ...prev,
+        users: prev.users.filter((_, i) => i !== index),
+        user: wasActive ? "" : prev.user,
+      }));
+
+      const isMe =
+        configured &&
+        (session?.user.email ?? "").toLowerCase() === user.email.toLowerCase();
+      if (isMe) {
+        await signOut();
+        return { ok: true, msg: "Akun dihapus — Anda telah keluar" };
+      }
+      return { ok: true, msg: "Akun dihapus" };
+    },
+    [configured, session, signOut],
+  );
 
   const cyclePerm = useCallback<StoreValue["cyclePerm"]>((role, module) => {
     setSnapshot((prev) => {
@@ -1688,9 +2048,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<StoreValue>(
     () => ({
       db,
+      storeReady,
       toast,
-      resetDemo,
+      clearData,
       updateBiz,
+      updatePrefs,
+      addExpense,
+      updateExpense,
+      removeExpense,
+      restoreData,
       addCustomer,
       requestCustomerEdit,
       requestCustomerDelete,
@@ -1700,6 +2066,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       recordPayment,
       requestSaleDelete,
       addProduct,
+      importProducts,
       submitChange,
       savePurchase,
       requestPurchaseLunas,
@@ -1713,13 +2080,20 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       toggleUser,
       inviteUser,
       updateUser,
+      deleteUser,
       cyclePerm,
     }),
     [
       db,
+      storeReady,
       toast,
-      resetDemo,
+      clearData,
       updateBiz,
+      updatePrefs,
+      addExpense,
+      updateExpense,
+      removeExpense,
+      restoreData,
       addCustomer,
       requestCustomerEdit,
       requestCustomerDelete,
@@ -1729,6 +2103,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       recordPayment,
       requestSaleDelete,
       addProduct,
+      importProducts,
       submitChange,
       savePurchase,
       requestPurchaseLunas,
@@ -1742,6 +2117,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       toggleUser,
       inviteUser,
       updateUser,
+      deleteUser,
       cyclePerm,
     ],
   );
@@ -1763,9 +2139,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
 type StoreValue = {
   db: DB;
+  /** False selama data toko dari Supabase belum selesai dimuat. */
+  storeReady: boolean;
   toast: (msg: string) => void;
-  resetDemo: () => void;
+  clearData: () => void;
   updateBiz: (patch: Biz) => Result;
+  updatePrefs: (patch: Prefs) => Result;
+  addExpense: (e: { date: string; cat: string; amt: number }) => Result;
+  updateExpense: (
+    index: number,
+    patch: { date?: string; cat?: string; amt?: number },
+  ) => Result;
+  removeExpense: (index: number) => Result;
+  restoreData: (data: DB) => Result;
   addCustomer: (c: {
     name: string;
     phone?: string;
@@ -1795,6 +2181,7 @@ type StoreValue = {
     maxPrice: number;
     variants: VariantInput[];
   }) => Result;
+  importProducts: (rows: ImportProductRow[]) => Result;
   submitChange: (
     vid: string,
     changes: {
@@ -1816,15 +2203,27 @@ type StoreValue = {
   submitOpname: (id: string) => Result;
   decideOpname: (id: string, ok: boolean) => void;
   decideApproval: (id: string, ok: boolean) => void;
-  setUserRole: (index: number, role: Role) => void;
-  toggleUser: (index: number) => void;
-  inviteUser: (u: { name: string; email: string; role: Role }) => Result;
+  setUserRole: (index: number, role: Role) => Promise<Result>;
+  toggleUser: (index: number) => Promise<Result>;
+  inviteUser: (u: {
+    name: string;
+    email: string;
+    role: Role;
+    password: string;
+  }) => Promise<Result>;
   updateUser: (
     index: number,
     patch: { name: string; email: string; role: Role },
-  ) => Result;
+  ) => Promise<Result>;
+  deleteUser: (index: number) => Promise<Result>;
   cyclePerm: (role: Role, module: ModuleKey) => void;
 };
+
+/** Nama toko bila tersedia (dipakai komponen kerangka seperti Drawer). */
+export function useStoreName(): string {
+  const ctx = useContext(StoreContext);
+  return ctx?.db.biz.name ?? "";
+}
 
 export function useStore(): StoreValue {
   const ctx = useContext(StoreContext);

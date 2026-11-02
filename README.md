@@ -7,7 +7,30 @@ Identitas visual dipertahankan: **Honey Gold × Deep Navy** (`#04123F` navy, `#F
 font Plus Jakarta Sans, sidebar gelap, tabel yang berubah jadi kartu di mobile, dan drawer
 form yang jadi bottom sheet di layar kecil.
 
-> ⚠️ Masih **prototipe**: seluruh data disimpan di `localStorage` browser (tidak ada backend).
+> ⚠️ Tanpa kredensial Supabase, seluruh data disimpan di `localStorage` browser (mode lokal, tanpa login).
+> Dengan kredensial Supabase, data toko disimpan di database dan setiap pengguna masuk dengan email + password.
+
+## Menyambung Supabase
+
+1. Jalankan `supabase/schema.sql` di project Supabase: **Dashboard → SQL Editor → New query → Run**.
+   Kalau database-nya sudah dibuat sebelum ada pengaturan tambahan (logo invoice, jatuh tempo
+   bawaan, ambang stok menipis, metode pembayaran), jalankan sekali juga
+   `supabase/migration-002-settings.sql` — hanya menambah 5 kolom di `store_settings`.
+   Skrip ini membuat tabel relasional: `products` + `product_variants`, `customers`,
+   `suppliers`, `sales` + `sale_items` + `sale_payments`, `purchases` + `purchase_items`,
+   `opnames` + `opname_lines`, `approvals`, `stock_history`, `expenses`,
+   `store_settings`, `role_permissions` — beserta policy RLS-nya. Aman dijalankan ulang.
+   Foreign key: `product_variants.product_id → products`, `sale_items/purchase_items/
+   opname_lines/stock_history.vid → product_variants`, `sales.customer_id → customers`
+   (`on delete set null`, nama toko tetap tersimpan di invoice).
+   Kalau dulu sempat jalan versi lama (satu tabel `app_state`), isinya diimpor otomatis
+   sekali saat aplikasi dibuka, lalu tabel `app_state` boleh dihapus.
+2. Isi tiga kredensial lewat halaman Secrets aplikasi (jangan tulis di file):
+   - `NEXT_PUBLIC_SUPABASE_URL` — *Project Settings → API → Project URL*
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — *Project Settings → API → anon public*
+   - `SUPABASE_SERVICE_ROLE_KEY` — *Project Settings → API → service_role* (hanya dipakai server untuk membuat akun)
+3. Buka aplikasi: layar masuk muncul. Karena belum ada akun, isi **Buat akun Owner** (nama, email, password).
+4. Pengguna lain ditambahkan dari menu **Pengguna &amp; Akses → Tambah pengguna** (lengkap dengan password).
 
 ## Menjalankan
 
@@ -28,7 +51,7 @@ src/
 ├── app/                    # App Router
 │   ├── layout.tsx          # font, metadata global, provider + shell
 │   ├── globals.css         # token desain (Tailwind v4 @theme) + komponen kustom
-│   ├── page.tsx            # Dashboard (+ JSON-LD LocalBusiness)
+│   ├── page.tsx            # Dashboard
 │   ├── sales/ ar/ stock/ purchases/ opname/ reports/ approvals/ users/ invoice/
 │   ├── invoice/[id]/       # invoice per transaksi (+ generateMetadata)
 │   ├── sitemap.ts robots.ts not-found.tsx
@@ -39,29 +62,57 @@ src/
 │   └── modules/            # view per fitur (dashboard, sales, ar, stock, ...)
 ├── lib/
 │   ├── types.ts            # tipe domain
-│   ├── seed.ts             # data demo deterministik
+│   ├── workspace.ts        # ruang kerja kosong + hak akses bawaan
+│   ├── users.ts            # daftar & ubah akun pengguna (Supabase Auth)
 │   ├── calc.ts             # helper laba/piutang
 │   ├── date.ts format.ts   # util tanggal & rupiah
 │   ├── persist.ts          # external store (localStorage) untuk useSyncExternalStore
+│   ├── remote.ts           # baca/tulis state ke Supabase (debounce + antrian)
+│   ├── db/                 # lapisan data: satu modul per domain
+│   │   ├── client.ts       # helper query + diff baris
+│   │   ├── products.ts     # produk & varian
+│   │   ├── partners.ts     # pelanggan & supplier
+│   │   ├── sales.ts        # penjualan, barang, pembayaran
+│   │   ├── purchases.ts    # pembelian supplier
+│   │   ├── opnames.ts      # stok opname
+│   │   ├── approvals.ts    # approval & audit
+│   │   ├── settings.ts     # identitas toko + hak akses role
+│   │   ├── logs.ts         # histori stok & biaya
+│   │   └── index.ts        # loadStore() / saveStore()
 │   ├── store.tsx           # context + seluruh action (create context, apply di store)
 │   └── nav.ts              # konfigurasi menu + ikon
 legacy/                     # HTML & CSS asli (referensi, tidak dipakai runtime)
 ```
 
-## Yang perlu diisi manual
+## Data aplikasi
 
-Semua data berasal dari mockup, jadi nilai berikut **placeholder** dan perlu diganti:
+Tidak ada data toko di dalam kode: seluruh data tersimpan di Supabase dalam tabel
+terpisah (`supabase/schema.sql`), satu modul kode per domain di `src/lib/db/`.
+Daftar pengguna dan role-nya adalah akun Supabase Auth yang sebenarnya
+(`GET/POST/PATCH /api/users`).
 
-| Item | Nilai sekarang | Lokasi |
+| Item | Diisi dari | Tersimpan di |
 | --- | --- | --- |
-| Identitas bisnis (nama, alamat, HP, email, NPWP, rekening) | `Rainbow Kids`, Jl. Pelangi Raya, 0812-2233-4455, halo@rainbowkids.id, NPWP 01.234.567.8-423.000, BCA 123-456-7890 | `src/lib/seed.ts` (`biz`) |
-| Tanggal acuan demo (`TODAY`) | `2026-10-20` | `src/lib/date.ts` |
-| User & role (Budi/Rina/Dimas/Sari) | data dummy | `src/lib/seed.ts` (`users`, `perms`) |
-| Produk, pelanggan, transaksi | data dummy 40 hari | `src/lib/seed.ts` |
+| Identitas toko (nama, alamat, HP, email, NPWP, rekening) | Pengaturan Toko | `store_settings` |
+| Hak akses per role | Pengguna & Akses | `role_permissions` |
+| Pengguna, role, status aktif | Pengguna & Hak Akses | Supabase Auth (`user_metadata.role`, ban = nonaktif) |
+| Produk & stok varian | Produk & Stok | `products`, `product_variants` |
+| Pelanggan / supplier | menu masing-masing | `customers`, `suppliers` |
+| Penjualan / piutang | Penjualan | `sales`, `sale_items`, `sale_payments` |
+| Pembelian supplier | Pembelian | `purchases`, `purchase_items` |
+| Stok opname | Stok Opname | `opnames`, `opname_lines` |
+| Approval, histori stok, biaya | Approval & Laporan | `approvals`, `stock_history`, `expenses` |
+| Biaya di luar order (sewa, gaji, listrik) | Biaya Operasional | `expenses` |
+| Pengaturan operasional (logo, catatan invoice, jatuh tempo, ambang stok, metode bayar) | Pengaturan Toko | `store_settings` |
+| Cadangan / pulihkan seluruh data | Pengaturan Toko | unduh & unggah berkas JSON |
+
+Tidak ada lagi data toko maupun nama brand yang ditulis di kode: nama toko, logo,
+dan catatan invoice berasal dari Pengaturan Toko, sedangkan metadata aplikasi memakai
+nama produk netral ("Business Suite").
 | Kontak WhatsApp / tautan sosial | tidak ada di HTML asli | belum ada — tambahkan di `src/components/layout/Topbar.tsx` |
 | Logo & gambar produk | tidak ada di HTML asli (semua ikon SVG inline) | `public/` |
 | Placeholder foto invoice | tidak ada | `src/components/modules/invoice/InvoiceView.tsx` |
-| Domain produksi | fallback `https://rainbowkids.id` | `NEXT_PUBLIC_SITE_URL` |
+| Domain produksi | fallback `http://localhost:3000` | `NEXT_PUBLIC_SITE_URL` |
 
 ## Alur kerja (hasil revisi sesuai feedback customer)
 
@@ -101,10 +152,14 @@ PENJUALAN BARU ──ajukan──▶ approval Owner ──▶ invoice tercatat +
 | Status bayar pembelian | “Belum Lunas” → ajukan pelunasan → approval Owner → “Lunas” |
 | Ekspor | Tombol “Ekspor Excel” di Penjualan & Piutang → `.csv` (BOM UTF-8, separator `;`) yang langsung dibuka Excel |
 | Riwayat perubahan | Varian/produk, pelunasan, dan status pembelian tercatat di menu Approval (sebelum → sesudah) |
+| Biaya operasional | Dicatat di menu **Biaya Operasional** (tanggal, kategori, jumlah) dan langsung masuk tab Biaya di Laporan — tanpa ini laba bersih hanya menghitung biaya per order |
+| Pengaturan operasional | Jatuh tempo tempo, ambang stok menipis, metode pembayaran, logo, dan catatan kaki invoice diatur di Pengaturan Toko (bukan ditulis di kode) |
+| Impor produk | Tombol **Template CSV** + **Impor CSV** di Produk & Stok: satu baris = satu varian (kategori, nama, varian, stok, modal, harga) |
 
 ## Fitur
 
 - **Dashboard** — omzet hari/bulan, estimasi laba, total & nilai stok, grafik area 14 hari, piutang aktif, transaksi terbaru, banner peringatan restock.
+- **Biaya Operasional** — catat/ubah/hapus pengeluaran di luar order, filter per bulan, ekspor CSV; angkanya masuk tab Biaya di Laporan.
 - **Penjualan** — pelanggan dari popup data tersimpan (+ tambah baru), harga jual bebas dengan histori harga sebagai acuan, kolom tanggal order + jatuh tempo, biaya ongkir/packing/lain, filter status bayar (lunas/belum lunas) & jenis, pencarian no. invoice/pelanggan, detail order + laba total & laba per unit, transaksi baru masuk approval Owner, pengajuan ubah harga/biaya, ekspor Excel.
 - **Piutang** — ringkasan total tagihan (belum jatuh tempo / jatuh tempo / terlambat) + kartu status, pencarian no. invoice/pelanggan, pembayaran sebagian (langsung berlaku) & pengajuan pelunasan (approval Owner), ekspor Excel.
 - **Produk & Stok** — kategori bebas, varian, rentang harga jual min–max, stok minus/prioritas restock, riwayat perubahan, pengajuan ubah harga (lewat approval).

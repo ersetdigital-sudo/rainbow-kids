@@ -8,6 +8,7 @@ export type ModuleKey =
   | "opname"
   | "ar"
   | "report"
+  | "expense"
   | "approval"
   | "users";
 
@@ -272,6 +273,24 @@ export type Biz = {
   bank: string;
 };
 
+/**
+ * Pengaturan operasional yang dulu ditulis mati di kode: identitas cetak
+ * invoice (logo & catatan kaki), jatuh tempo tempo, ambang stok menipis, dan
+ * daftar metode pembayaran.
+ */
+export type Prefs = {
+  /** Logo toko sebagai data URL (atau URL gambar bila di-host sendiri). */
+  logo: string;
+  /** Catatan kaki yang tercetak di bawah total invoice. */
+  note: string;
+  /** Jatuh tempo bawaan transaksi tempo, dalam hari. */
+  dueDays: number;
+  /** Stok di bawah angka ini dianggap menipis. */
+  minStock: number;
+  /** Pilihan metode pembayaran yang muncul di form pembayaran. */
+  methods: string[];
+};
+
 export type DB = {
   products: Product[];
   customers: Customer[];
@@ -285,6 +304,7 @@ export type DB = {
   users: AppUser[];
   perms: Record<Role, Record<ModuleKey, string>>;
   biz: Biz;
+  prefs: Prefs;
   user: string;
 };
 

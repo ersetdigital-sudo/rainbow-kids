@@ -24,10 +24,17 @@ export function EditUserDrawer({
   const [name, setName] = useState(user?.name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
   const [role, setRole] = useState<Role>(user?.role ?? "User");
+  const [busy, setBusy] = useState(false);
   const locked = user?.role === "Owner";
 
-  const submit = () => {
-    const res = updateUser(index, { name, email, role: locked ? "Owner" : role });
+  const submit = async () => {
+    setBusy(true);
+    const res = await updateUser(index, {
+      name,
+      email,
+      role: locked ? "Owner" : role,
+    });
+    setBusy(false);
     toast(res.msg);
     if (res.ok) onClose();
   };
@@ -42,8 +49,13 @@ export function EditUserDrawer({
           <button type="button" className="btn" onClick={onClose}>
             Batal
           </button>
-          <button type="button" className="btn p" onClick={submit}>
-            Simpan
+          <button
+            type="button"
+            className="btn p"
+            onClick={submit}
+            disabled={busy}
+          >
+            {busy ? "Menyimpan..." : "Simpan"}
           </button>
         </>
       }

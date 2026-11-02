@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-const base = process.env.NEXT_PUBLIC_SITE_URL ?? "https://rainbowkids.id";
+const base = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const routes = [
@@ -12,6 +12,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/purchases", priority: 0.8, freq: "weekly" as const },
     { path: "/opname", priority: 0.7, freq: "weekly" as const },
     { path: "/reports", priority: 0.8, freq: "weekly" as const },
+    { path: "/expenses", priority: 0.7, freq: "weekly" as const },
     { path: "/history", priority: 0.8, freq: "weekly" as const },
     { path: "/approvals", priority: 0.7, freq: "weekly" as const },
     { path: "/invoice", priority: 0.7, freq: "weekly" as const },

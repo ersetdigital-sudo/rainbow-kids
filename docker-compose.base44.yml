@@ -11,6 +11,10 @@ services:
     volumes:
       - ./:/app
       - base44_node_modules:/app/node_modules
+    # Kredensial Supabase (URL, anon key, service role key) dari dashboard.
+    # File ini di luar repo dan diisi platform; jangan taruh nilainya di sini.
+    env_file:
+      - /run/base44/app.env
     environment:
       - NODE_ENV=development
       - BASE44_PREVIEW_MODE

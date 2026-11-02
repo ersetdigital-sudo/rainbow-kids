@@ -3,6 +3,9 @@
 import { motion } from "motion/react";
 import { usePathname } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import { LoginScreen } from "@/components/auth/LoginScreen";
+import { useAuth } from "@/lib/auth";
+import { useStore, useStoreName } from "@/lib/store";
 import { BottomNav } from "./BottomNav";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
@@ -32,6 +35,9 @@ function SidebarFallback() {
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const { configured, ready, session } = useAuth();
+  const { storeReady } = useStore();
+  const storeName = useStoreName();
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
@@ -41,10 +47,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (window.innerWidth >= 900 && window.innerWidth < 1200) setCollapsed(true);
   }, []);
 
+  // Judul tab mengikuti nama toko di Pengaturan Toko (bukan nama brand di kode).
+  useEffect(() => {
+    if (!storeReady || !storeName) return;
+    document.title = `${storeName} · Business Suite`;
+  }, [storeReady, storeName]);
+
   const toggleSidebar = () => {
     if (window.matchMedia("(max-width: 899px)").matches) setOpen(true);
     else setCollapsed((c) => !c);
   };
+
+  // Supabase aktif: layar masuk menutup seluruh aplikasi sampai sesi ada.
+  // Segmen halaman tetap ter-mount supaya navigasi tetap tervalidasi.
+  const gate = configured && (!ready || !session);
+  // Sudah masuk tetapi data toko belum selesai dibaca: tahan dashboard dulu
+  // supaya tidak sempat tampil kosong sebelum datanya siap.
+  const loadingStore = !gate && !storeReady;
 
   return (
     <>
@@ -66,6 +85,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Suspense fallback={null}>
         <BottomNav onMenu={() => setOpen(true)} />
       </Suspense>
+
+      {(gate || loadingStore) && (
+        <div className="fixed inset-0 z-[95] overflow-y-auto">
+          {gate && ready ? (
+            <LoginScreen />
+          ) : (
+            <div
+              className="min-h-screen grid place-items-center text-sm"
+              style={{ background: "#F5F7FB", color: "var(--mu)" }}
+            >
+              {loadingStore ? "Menyiapkan data toko…" : "Memuat…"}
+            </div>
+          )}
+        </div>
+      )}
     </>
   );
 }

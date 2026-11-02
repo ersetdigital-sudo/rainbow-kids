@@ -21,7 +21,7 @@ export function PayDrawer({
   const [date, setDate] = useState(TODAY);
   // Default-nya sisa tagihan (komponen di-remount per invoice oleh parent).
   const [amt, setAmt] = useState(rem);
-  const [method, setMethod] = useState("Transfer");
+  const [method, setMethod] = useState(db.prefs.methods[0] ?? "Transfer");
 
   if (!sale) return null;
 
@@ -75,9 +75,9 @@ export function PayDrawer({
         <div>
           <label className="f">Metode</label>
           <select value={method} onChange={(e) => setMethod(e.target.value)}>
-            <option>Transfer</option>
-            <option>Tunai</option>
-            <option>QRIS</option>
+            {db.prefs.methods.map((m) => (
+              <option key={m}>{m}</option>
+            ))}
           </select>
         </div>
       </div>

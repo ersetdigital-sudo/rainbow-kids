@@ -2,5 +2,21 @@
   "previewPort": 3000,
   "healthPath": "/",
   "startCommand": "docker compose -f docker-compose.base44.yml up -d",
-  "secrets": []
+  "secrets": [
+    {
+      "name": "NEXT_PUBLIC_SUPABASE_URL",
+      "description": "URL project Supabase (Supabase Dashboard → Project Settings → API → Project URL).",
+      "requiredAtBoot": false
+    },
+    {
+      "name": "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      "description": "Anon/public key project Supabase (Project Settings → API → anon public).",
+      "requiredAtBoot": false
+    },
+    {
+      "name": "SUPABASE_SERVICE_ROLE_KEY",
+      "description": "Service role key project Supabase (Project Settings → API → service_role). Hanya dipakai di server untuk membuat akun pengguna.",
+      "requiredAtBoot": false
+    }
+  ]
 }
