@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { formatDate } from "@/lib/date";
 import { rp } from "@/lib/format";
 import { findVariant, opnameDiff } from "@/lib/calc";
+import { compareOpname } from "@/lib/opname";
 import { useStore } from "@/lib/store";
 import { Badge } from "@/components/ui/Badge";
 import { Drawer } from "@/components/ui/Drawer";
@@ -29,19 +30,27 @@ export function OpnameDrawer({
   const { db, updateOpnameLine, submitOpname, decideOpname, toast } = useStore();
   const o = db.opnames.find((x) => x.id === opnameId) ?? null;
 
-  const diffLines = useMemo(
-    () => (o ? o.lines.filter((l) => l.phys !== "" && l.phys !== l.sys) : []),
-    [o],
+  // Sesi yang belum diputuskan dibandingkan dengan stok terkini dari tabel produk;
+  // sesi yang sudah diputuskan memakai stok sistem yang tersimpan saat keputusan.
+  const live = o ? o.status === "Draft" || o.status === "Menunggu" : false;
+  const cmp = useMemo(
+    () => (o && live ? compareOpname(db.products, o.lines) : null),
+    [o, live, db.products],
   );
 
   if (!o) return null;
 
   const editable = o.status === "Draft";
-  const diffValue = diffLines.reduce((a, l) => {
-    const v = findVariant(db, l.vid);
-    return a + opnameDiff(l) * (v?.cost ?? 0);
-  }, 0);
-  const missing = diffLines.filter((l) => !l.note).length;
+  const diffLines = cmp
+    ? cmp.diffRows
+    : o.lines.filter((l) => l.phys !== "" && l.phys !== l.sys);
+  const diffValue = cmp
+    ? cmp.diffValue
+    : diffLines.reduce((a, l) => {
+        const v = findVariant(db, l.vid);
+        return a + opnameDiff(l) * (v?.cost ?? 0);
+      }, 0);
+  const missing = cmp ? cmp.missingNote : diffLines.filter((l) => !l.note).length;
 
   const lastPurchase = (vid: string) => {
     const ps = db.purchases.filter((p) => p.items.some((i) => i.vid === vid));
@@ -51,9 +60,8 @@ export function OpnameDrawer({
     return `${p.id} · ${formatDate(p.date)} · +${item?.qty ?? 0}`;
   };
 
-  const diffText = (l: (typeof o.lines)[number]) => {
-    if (l.phys === "") return <span style={{ color: "var(--mu)" }}>0</span>;
-    const d = opnameDiff(l);
+  const diffText = (d: number, counted: boolean) => {
+    if (!counted) return <span style={{ color: "var(--mu)" }}>0</span>;
     return (
       <span
         style={{
@@ -145,7 +153,9 @@ export function OpnameDrawer({
           </thead>
           <tbody>
             {o.lines.map((l, i) => {
+              const row = cmp?.rows[i] ?? null;
               const label = (() => {
+                if (row) return row.label;
                 for (const p of db.products) {
                   const v = p.variants.find((x) => x.id === l.vid);
                   if (v) return `${p.name} · ${v.name}`;
@@ -161,7 +171,7 @@ export function OpnameDrawer({
                     {lastPurchase(l.vid)}
                   </td>
                   <td data-label="Sistem" className="r">
-                    {l.sys}
+                    {row ? row.sys : l.sys}
                   </td>
                   <td data-label="Fisik" className="r">
                     {editable ? (
@@ -182,7 +192,7 @@ export function OpnameDrawer({
                     )}
                   </td>
                   <td data-label="Selisih" className="r font-semibold">
-                    {diffText(l)}
+                    {diffText(row ? row.diff : opnameDiff(l), row ? row.counted : l.phys !== "")}
                   </td>
                   <td data-label="Penyebab">
                     {editable ? (

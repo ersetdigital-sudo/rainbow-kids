@@ -26,6 +26,7 @@ import {
   saleProposed,
   saleTotal,
 } from "./calc";
+import { compareOpname } from "./opname";
 import {
   activateBrowserSnapshot,
   getServerSnapshot,
@@ -1065,12 +1066,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const submitOpname = useCallback<StoreValue["submitOpname"]>(
     (id) => {
-      const o = getSnapshot().opnames.find((x) => x.id === id);
+      const current = getSnapshot();
+      const o = current.opnames.find((x) => x.id === id);
       if (!o) return { ok: false, msg: "Sesi opname tidak ditemukan" };
-      const missing = o.lines.some(
-        (l) => l.phys !== "" && l.phys !== l.sys && !l.note,
-      );
-      if (missing)
+      const cmp = compareOpname(current.products, o.lines);
+      if (!cmp.ready)
         return { ok: false, msg: "Isi penyebab untuk setiap selisih" };
       const submittedAt = nowStamp();
       setSnapshot((prev) => ({
@@ -1091,22 +1091,24 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setSnapshot((prev) => {
       const o = prev.opnames.find((x) => x.id === id);
       if (!o) return prev;
+      // Selisih dihitung terhadap stok terkini di tabel produk, bukan snapshot sesi.
+      const cmp = compareOpname(prev.products, o.lines);
+      const diffByVid = new Map(cmp.diffRows.map((r) => [r.vid, r]));
+      const sysByVid = new Map(cmp.rows.map((r) => [r.vid, r.sys]));
       const history = [...prev.history];
       const products = prev.products.map((p) => ({
         ...p,
         variants: p.variants.map((v) => {
-          const line = o.lines.find((l) => l.vid === v.id);
-          if (!ok || !line || line.phys === "" || line.phys === line.sys)
-            return v;
-          const d = line.phys - line.sys;
+          const row = diffByVid.get(v.id);
+          if (!ok || !row) return v;
           history.push({
             vid: v.id,
             date: TODAY,
             type: "Stok" as const,
-            desc: `Stok opname ${o.id}: ${d > 0 ? "+" : ""}${d} (${line.note})`,
+            desc: `Stok opname ${o.id}: ${row.diff > 0 ? "+" : ""}${row.diff} (${row.note})`,
             user: prev.user,
           });
-          return { ...v, stock: v.stock + d };
+          return { ...v, stock: v.stock + row.diff };
         }),
       }));
       return {
@@ -1115,7 +1117,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         history,
         opnames: prev.opnames.map((x) =>
           x.id === id
-            ? { ...x, status: ok ? "Disetujui" : "Ditolak", by: prev.user, decidedAt }
+            ? {
+                ...x,
+                // Simpan stok sistem yang dipakai saat selisih diputuskan.
+                lines: x.lines.map((l) => {
+                  const sys = sysByVid.get(l.vid);
+                  return sys === undefined ? l : { ...l, sys };
+                }),
+                status: ok ? "Disetujui" : "Ditolak",
+                by: prev.user,
+                decidedAt,
+              }
             : x,
         ),
       };
