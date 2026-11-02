@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Drawer } from "@/components/ui/Drawer";
 import { Icon } from "@/components/ui/Icon";
 import { OverdueWarningDialog } from "@/components/ui/OverdueWarningDialog";
-import type { Approval } from "@/lib/types";
+import type { Approval, CustomerChange } from "@/lib/types";
 
 function DecisionFooter({
   approval,
@@ -153,6 +153,114 @@ export function ApprovalDetailDrawer({
     );
   }
 
+  /* ---------------- Ubah data toko ---------------- */
+  if (a.kind === "customerEdit") {
+    const customer = db.customers.find((c) => c.id === a.customerId);
+    const changes = a.customerChanges ?? [];
+    const fields: { field: CustomerChange["field"]; label: string }[] = [
+      { field: "name", label: "Nama toko" },
+      { field: "phone", label: "No. HP" },
+      { field: "address", label: "Alamat" },
+    ];
+    /** Nilai sebelum (data sekarang) atau sesudah (usulan pengajuan). */
+    const valueOf = (field: CustomerChange["field"], after: boolean) => {
+      const change = changes.find((c) => c.field === field);
+      if (change) return after ? change.after : change.before;
+      if (!customer) return "";
+      const value =
+        field === "name"
+          ? customer.name
+          : field === "phone"
+            ? customer.phone
+            : customer.address;
+      return value ?? "";
+    };
+    return (
+      <Drawer
+        open={Boolean(approvalId)}
+        onClose={onClose}
+        title="Detail ubah data toko"
+        footer={<DecisionFooter approval={a} onClose={onClose} />}
+      >
+        <div className="sdtop">
+          <div>
+            <div className="text-xs" style={{ color: "var(--mu)" }}>
+              Pengajuan ubah · {customer ? customerStatus(customer) : "-"}
+            </div>
+            <div
+              className="font-extrabold text-lg"
+              style={{ color: "var(--nv)" }}
+            >
+              {a.customerName ?? customer?.name ?? "-"}
+            </div>
+          </div>
+          <Badge tone={a.status}>{a.status}</Badge>
+        </div>
+
+        <div className="sdc">
+          <div className="sdh">
+            <span className="sdi">
+              <Icon name="cust" />
+            </span>
+            <span>Sebelum &amp; sesudah</span>
+          </div>
+          {fields.map(({ field, label }) => {
+            const before = valueOf(field, false) || "—";
+            const after = valueOf(field, true) || "—";
+            const changed = before !== after;
+            return (
+              <div
+                key={field}
+                className="py-2 border-b"
+                style={{ borderColor: "var(--ln)" }}
+              >
+                <div className="text-[11.5px]" style={{ color: "var(--mu)" }}>
+                  {label}
+                </div>
+                {changed ? (
+                  <div className="text-[13.5px]">
+                    <s style={{ color: "var(--mu)" }}>{before}</s>
+                    <span style={{ color: "var(--mu)" }}> → </span>
+                    <b style={{ color: "var(--nv)" }}>{after}</b>
+                  </div>
+                ) : (
+                  <div className="text-[13.5px]" style={{ color: "var(--mu)" }}>
+                    {before} <span>(tidak berubah)</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="sim">
+          Disetujui: perubahan diterapkan ke data toko, termasuk nama toko di
+          invoice lama. Ditolak: data toko tetap seperti semula.
+        </div>
+
+        <div className="text-[13px] px-1 mt-3">
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>Diajukan</span>
+            <b style={{ color: "var(--nv)" }}>{a.user}</b>
+          </div>
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>Waktu</span>
+            <b style={{ color: "var(--nv)" }}>{a.time}</b>
+          </div>
+          {a.decidedAt && (
+            <div className="flex justify-between py-1.5">
+              <span style={{ color: "var(--mu)" }}>Diputuskan</span>
+              <b style={{ color: "var(--nv)" }}>
+                {a.decidedAt}
+                {a.by ? ` oleh ${a.by}` : ""}
+              </b>
+            </div>
+          )}
+        </div>
+      </Drawer>
+    );
+  }
+
   /* ---------------- Hapus toko ---------------- */
   if (a.kind === "customerDelete") {
     const customer = db.customers.find((c) => c.id === a.customerId);
@@ -235,7 +343,7 @@ export function ApprovalDetailDrawer({
         <div className="sdtop">
           <div>
             <div className="text-xs" style={{ color: "var(--mu)" }}>
-              {sale ? `${formatDate(sale.date)} · ${sale.type === "tempo" ? "Tempo" : "Tunai"}` : "Order"}
+              {sale ? `${formatDate(sale.date)} · ${sale.type === "tempo" ? "Tempo" : "COD"}` : "Order"}
             </div>
             <div
               className="font-extrabold text-lg"
@@ -545,7 +653,7 @@ export function ApprovalDetailDrawer({
             <b style={{ color: "var(--nv)" }}>
               {req.type === "tempo"
                 ? `Tempo · jatuh tempo ${formatDate(req.due)}`
-                : "Tunai (lunas otomatis)"}
+                : "COD · belum lunas (tanpa jatuh tempo)"}
             </b>
           </div>
           {req.type === "tempo" && (

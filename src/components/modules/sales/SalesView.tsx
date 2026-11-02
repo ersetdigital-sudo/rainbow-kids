@@ -95,7 +95,7 @@ export function SalesView() {
         s.customer,
         customerOf(s)?.phone?.trim() || "-",
         customerOf(s)?.address?.trim() || "-",
-        s.type === "tempo" ? "Tempo" : "Tunai",
+        s.type === "tempo" ? "Tempo" : "COD",
         rp(saleTotal(s)),
         rp(saleCost(s)),
         rp(saleOps(s)),
@@ -154,7 +154,7 @@ export function SalesView() {
     <>
       <PageHead
         title="Penjualan"
-        subtitle="Catat transaksi tunai & tempo, lengkap dengan laba per order."
+        subtitle="Catat transaksi COD & tempo, lengkap dengan laba per order."
         actions={
           <>
             <button
@@ -201,7 +201,7 @@ export function SalesView() {
             aria-label="Filter jenis pembayaran"
           >
             <option value="">Semua jenis</option>
-            <option value="tunai">Tunai</option>
+            <option value="tunai">COD</option>
             <option value="tempo">Tempo</option>
           </select>
         </div>

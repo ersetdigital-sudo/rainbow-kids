@@ -214,10 +214,10 @@ export function InvoiceView({ invoiceId }: { invoiceId?: string }) {
               <span style={{ color: "#777" }}>Tanggal:</span> {formatDate(sale.date)}
               <br />
               <span style={{ color: "#777" }}>Jatuh tempo:</span>{" "}
-              {sale.due ? formatDate(sale.due) : "Tunai"}
+              {sale.due ? formatDate(sale.due) : "—"}
               <br />
               <span style={{ color: "#777" }}>Pembayaran:</span>{" "}
-              {sale.type === "tempo" ? "Tempo" : "Tunai"}
+              {sale.type === "tempo" ? "Tempo" : "COD"}
             </div>
           </div>
 

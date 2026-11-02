@@ -20,6 +20,7 @@ const DETAIL_KINDS = new Set<Approval["kind"]>([
   "sale",
   "invoice",
   "customer",
+  "customerEdit",
   "customerDelete",
   "saleDelete",
 ]);
@@ -68,7 +69,11 @@ export function ApprovalsView({ focusId = null }: { focusId?: string | null }) {
       const p = db.purchases.find((x) => x.id === a.purchaseId);
       return `Revisi nota ${a.purchaseRequest?.nota ?? p?.nota ?? "-"} · ${a.purchaseRequest?.supplier ?? p?.supplier ?? "-"}`;
     }
-    if (a.kind === "customer" || a.kind === "customerDelete") {
+    if (
+      a.kind === "customer" ||
+      a.kind === "customerEdit" ||
+      a.kind === "customerDelete"
+    ) {
       return (
         a.customerName ??
         db.customers.find((c) => c.id === a.customerId)?.name ??
@@ -100,6 +105,7 @@ export function ApprovalsView({ focusId = null }: { focusId?: string | null }) {
     if (a.kind === "purchase") return String(v);
     if (
       a.kind === "customer" ||
+      a.kind === "customerEdit" ||
       a.kind === "customerDelete" ||
       a.kind === "saleDelete"
     )
@@ -219,7 +225,9 @@ export function ApprovalsView({ focusId = null }: { focusId?: string | null }) {
                               ? "Harga & biaya invoice disetujui"
                               : a.kind === "customer"
                                 ? "Toko disetujui — status Aktif"
-                                : a.kind === "customerDelete"
+                                : a.kind === "customerEdit"
+                                  ? "Perubahan data toko disetujui & diterapkan"
+                                  : a.kind === "customerDelete"
                                   ? "Pengajuan hapus toko disetujui"
                                   : a.kind === "saleDelete"
                                     ? "Order dihapus — stok dikembalikan"

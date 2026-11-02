@@ -18,7 +18,7 @@ export function CustomerDrawer({
   customerId: string | null;
   onClose: () => void;
 }) {
-  const { db, addCustomer, updateCustomer, requestCustomerDelete, toast } =
+  const { db, addCustomer, requestCustomerEdit, requestCustomerDelete, toast } =
     useStore();
   const isNew = customerId === "new";
   const existing =
@@ -41,10 +41,20 @@ export function CustomerDrawer({
       ),
   );
 
+  const pendingEdit = Boolean(
+    existing &&
+      db.approvals.some(
+        (a) =>
+          a.kind === "customerEdit" &&
+          a.customerId === existing.id &&
+          a.status === "Menunggu",
+      ),
+  );
+
   const submit = () => {
     const res = isNew
       ? addCustomer({ name, phone, address })
-      : updateCustomer(customerId!, { name, phone, address });
+      : requestCustomerEdit(customerId!, { name, phone, address });
     toast(res.msg);
     if (res.ok) onClose();
   };
@@ -70,8 +80,13 @@ export function CustomerDrawer({
           <button type="button" className="btn" onClick={onClose}>
             Batal
           </button>
-          <button type="button" className="btn p" onClick={submit}>
-            Simpan
+          <button
+            type="button"
+            className="btn p"
+            disabled={pendingEdit}
+            onClick={submit}
+          >
+            {isNew ? "Simpan" : "Ajukan perubahan"}
           </button>
         </>
       }
@@ -83,6 +98,12 @@ export function CustomerDrawer({
             " — menunggu approval Owner."}
           {customerStatus(existing) === "Diarsipkan" &&
             " — tidak bisa dipilih di transaksi baru."}
+        </div>
+      )}
+      {pendingEdit && (
+        <div className="sim mb-3">
+          Perubahan data toko ini sedang menunggu persetujuan Owner. Data lama
+          tetap dipakai sampai pengajuan diputuskan.
         </div>
       )}
       <div className="grid sm:grid-cols-2 gap-3">

@@ -43,13 +43,15 @@ export function SaleFormDrawer({
   const [newAddress, setNewAddress] = useState("");
   const [overdueOpen, setOverdueOpen] = useState(false);
   const [overdueAck, setOverdueAck] = useState(false);
+  /** Pesan error di field jenis transaksi (COD/Tempo wajib dipilih). */
+  const [typeError, setTypeError] = useState("");
 
   // State di-reset lewat remount (parent memberi key berbeda tiap dibuka).
   const [draft, setDraft] = useState<SaleDraft>(() => ({
     customer: "",
     customerId: undefined,
     date: TODAY,
-    type: "tunai",
+    type: "",
     due: addDays(TODAY, 14),
     items: variants[0]
       ? [{ vid: variants[0].id, qty: 1, price: variants[0].price }]
@@ -105,6 +107,11 @@ export function SaleFormDrawer({
     }));
 
   const submit = () => {
+    if (!draft.type) {
+      setTypeError("Pilih jenis transaksi dulu — COD atau Tempo.");
+      return;
+    }
+    setTypeError("");
     const res = saveSale(draft);
     if (!res.ok) {
       toast(res.msg);
@@ -164,16 +171,37 @@ export function SaleFormDrawer({
             />
           </div>
           <div>
-            <label className="f">Jenis pembayaran</label>
+            <label className="f" htmlFor="sale-type">
+              Jenis transaksi
+            </label>
             <select
+              id="sale-type"
               value={draft.type}
-              onChange={(e) =>
-                setDraft({ ...draft, type: e.target.value as "tunai" | "tempo" })
-              }
+              aria-invalid={Boolean(typeError)}
+              aria-describedby={typeError ? "sale-type-error" : undefined}
+              style={typeError ? { borderColor: "var(--er)" } : undefined}
+              onChange={(e) => {
+                setTypeError("");
+                setDraft({
+                  ...draft,
+                  type: e.target.value as SaleDraft["type"],
+                });
+              }}
             >
-              <option value="tunai">Tunai (langsung lunas)</option>
+              <option value="">Pilih jenis transaksi</option>
+              <option value="tunai">COD (bayar saat terima)</option>
               <option value="tempo">Tempo (piutang)</option>
             </select>
+            {typeError && (
+              <div
+                id="sale-type-error"
+                role="alert"
+                className="text-[11.5px] mt-1"
+                style={{ color: "var(--er)" }}
+              >
+                {typeError}
+              </div>
+            )}
           </div>
           {draft.type === "tempo" ? (
             <div>

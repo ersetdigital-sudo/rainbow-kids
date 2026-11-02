@@ -32,6 +32,7 @@ const KIND_META: Record<
   purchase: { label: "Status Bayar Pembelian", icon: "purch" },
   sale: { label: "Ubah Harga & Biaya", icon: "invoice" },
   customer: { label: "Toko Baru", icon: "cust" },
+  customerEdit: { label: "Ubah Toko", icon: "cust" },
   customerDelete: { label: "Hapus Toko", icon: "cust" },
   saleDelete: { label: "Hapus Penjualan", icon: "sales" },
 };
@@ -44,6 +45,7 @@ const DETAIL_KINDS = new Set<Approval["kind"]>([
   "purchase",
   "sale",
   "customer",
+  "customerEdit",
   "customerDelete",
   "saleDelete",
 ]);
@@ -150,6 +152,19 @@ function approvalActivity(db: DB, a: Approval): ActivityItem {
             : a.status === "Disetujui"
               ? "Toko disetujui — status Aktif"
               : "Toko ditolak — diarsipkan",
+      };
+    }
+    case "customerEdit": {
+      const customer = db.customers.find((c) => c.id === a.customerId);
+      const fields = (a.customerChanges ?? []).map((c) =>
+        c.field === "name" ? "nama" : c.field === "phone" ? "HP" : "alamat",
+      );
+      return {
+        ...base,
+        summary: a.customerName ?? customer?.name ?? "-",
+        detail: fields.length
+          ? `Perubahan ${fields.join(", ")}`
+          : "Pengajuan ubah data toko",
       };
     }
     case "customerDelete": {
