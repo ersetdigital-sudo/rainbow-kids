@@ -82,6 +82,11 @@ export function OpnameView() {
             type="button"
             className="btn p"
             onClick={() => {
+              // Tanpa produk tidak ada yang bisa dibandingkan.
+              if (!db.products.length) {
+                toast("Belum ada produk. Tambahkan produk dulu di Produk & Stok.");
+                return;
+              }
               const id = startOpname();
               toast("Sesi opname dibuat");
               setOpenId(id);
