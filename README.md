@@ -17,6 +17,9 @@ form yang jadi bottom sheet di layar kecil.
    `suppliers`, `sales` + `sale_items` + `sale_payments`, `purchases` + `purchase_items`,
    `opnames` + `opname_lines`, `approvals`, `stock_history`, `expenses`,
    `store_settings`, `role_permissions` — beserta policy RLS-nya. Aman dijalankan ulang.
+   Foreign key: `product_variants.product_id → products`, `sale_items/purchase_items/
+   opname_lines/stock_history.vid → product_variants`, `sales.customer_id → customers`
+   (`on delete set null`, nama toko tetap tersimpan di invoice).
    Kalau dulu sempat jalan versi lama (satu tabel `app_state`), isinya diimpor otomatis
    sekali saat aplikasi dibuka, lalu tabel `app_state` boleh dihapus.
 2. Isi tiga kredensial lewat halaman Secrets aplikasi (jangan tulis di file):

@@ -230,7 +230,72 @@ create table if not exists public.expenses (
 );
 
 -- ---------------------------------------------------------------------------
--- 8. Hak akses tabel
+-- 8. Relasi antar tabel (foreign key)
+--
+-- * Baris transaksi (penjualan, pembelian, opname, histori stok) menunjuk ke
+--   varian produk yang benar-benar ada -> tidak ada lagi "vid" yatim.
+-- * Varian yang masih dipakai transaksi tidak bisa dihapus (NO ACTION),
+--   supaya riwayat penjualan/pembelian tidak ikut hilang.
+-- * Toko yang dihapus tidak menghapus invoice-nya: `sales.customer_id`
+--   di-set NULL, nama toko tetap tersimpan di kolom `customer`.
+-- Aman dijalankan ulang: tiap constraint dicek dulu sebelum dibuat.
+-- ---------------------------------------------------------------------------
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'sale_items_vid_fkey' and conrelid = 'public.sale_items'::regclass
+  ) then
+    alter table public.sale_items
+      add constraint sale_items_vid_fkey
+      foreign key (vid) references public.product_variants (id);
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'purchase_items_vid_fkey' and conrelid = 'public.purchase_items'::regclass
+  ) then
+    alter table public.purchase_items
+      add constraint purchase_items_vid_fkey
+      foreign key (vid) references public.product_variants (id);
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'opname_lines_vid_fkey' and conrelid = 'public.opname_lines'::regclass
+  ) then
+    alter table public.opname_lines
+      add constraint opname_lines_vid_fkey
+      foreign key (vid) references public.product_variants (id);
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'stock_history_vid_fkey' and conrelid = 'public.stock_history'::regclass
+  ) then
+    alter table public.stock_history
+      add constraint stock_history_vid_fkey
+      foreign key (vid) references public.product_variants (id);
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'sales_customer_id_fkey' and conrelid = 'public.sales'::regclass
+  ) then
+    alter table public.sales
+      add constraint sales_customer_id_fkey
+      foreign key (customer_id) references public.customers (id) on delete set null;
+  end if;
+end $$;
+
+-- Index untuk kolom relasi (mempercepat join & pengecekan foreign key).
+create index if not exists sale_items_vid_idx on public.sale_items (vid);
+create index if not exists purchase_items_vid_idx on public.purchase_items (vid);
+create index if not exists opname_lines_vid_idx on public.opname_lines (vid);
+
+-- ---------------------------------------------------------------------------
+-- 9. Hak akses tabel
 -- Satu toko dipakai bersama, jadi setiap pengguna yang sudah login
 -- (role "authenticated") boleh baca & tulis. Tamu (anon) tidak dapat apa pun.
 -- ---------------------------------------------------------------------------
@@ -267,13 +332,22 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
--- 9. Cek hasil: harus muncul 16 tabel di bawah ini.
+-- 10. Cek hasil
+-- A) harus muncul 16 tabel.
+-- B) harus muncul 5 relasi foreign key.
 -- ---------------------------------------------------------------------------
 
 select table_name
 from information_schema.tables
 where table_schema = 'public' and table_type = 'BASE TABLE'
 order by table_name;
+
+select conrelid::regclass as tabel,
+       conname as relasi,
+       pg_get_constraintdef(oid) as definisi
+from pg_constraint
+where contype = 'f' and connamespace = 'public'::regnamespace
+order by 1, 2;
 
 -- Catatan:
 -- * Tabel lama `public.app_state` (satu baris jsonb) tidak dipakai lagi.
