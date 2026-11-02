@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   useSyncExternalStore,
@@ -22,6 +23,7 @@ import {
   saleTotal,
 } from "./calc";
 import {
+  activateBrowserSnapshot,
   getServerSnapshot,
   getSnapshot,
   resetSnapshot,
@@ -120,6 +122,13 @@ const StoreContext = createContext<StoreValue | null>(null);
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const db = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const [toasts, setToasts] = useState<{ id: number; msg: string }[]>([]);
+
+  // Data tersimpan di browser baru dipakai setelah hydration selesai, supaya
+  // markup server & client sama dan tidak memicu hydration mismatch.
+  useEffect(() => {
+    const timer = window.setTimeout(activateBrowserSnapshot, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const toast = useCallback((msg: string) => {
     const id = Date.now() + Math.random();

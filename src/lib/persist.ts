@@ -26,6 +26,7 @@ function migrate(db: DB): DB {
 
 let clientCache: DB | null = null;
 let serverCache: DB | null = null;
+let browserReady = false;
 const listeners = new Set<() => void>();
 
 /** Snapshot untuk SSR & hydration (harus referensial stabil). */
@@ -34,10 +35,17 @@ export function getServerSnapshot(): DB {
   return serverCache;
 }
 
-/** Snapshot di browser: ambil dari localStorage, fallback ke seed. */
+/**
+ * Snapshot di browser: ambil dari localStorage, fallback ke seed.
+ *
+ * Selama hydration belum selesai, tetap pakai snapshot server supaya markup
+ * server & client identik. Data tersimpan baru dipakai lewat
+ * `activateBrowserSnapshot` agar tidak memicu hydration mismatch.
+ */
 export function getSnapshot(): DB {
-  if (clientCache) return clientCache;
   if (typeof window === "undefined") return getServerSnapshot();
+  if (!browserReady) return getServerSnapshot();
+  if (clientCache) return clientCache;
   try {
     const raw = window.localStorage.getItem(KEY);
     const parsed = raw ? (JSON.parse(raw) as DB) : null;
@@ -52,6 +60,17 @@ export function getSnapshot(): DB {
     clientCache = getServerSnapshot();
   }
   return clientCache;
+}
+
+/**
+ * Mulai pakai snapshot browser (localStorage). Dipanggil setelah hydration
+ * selesai, lalu listener diberi tahu agar UI memakai data tersimpan.
+ */
+export function activateBrowserSnapshot() {
+  if (typeof window === "undefined" || browserReady) return;
+  browserReady = true;
+  getSnapshot();
+  listeners.forEach((l) => l());
 }
 
 export function subscribe(listener: () => void) {
