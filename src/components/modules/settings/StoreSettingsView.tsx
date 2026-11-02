@@ -4,12 +4,21 @@ import { useState } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { PageHead } from "@/components/ui/PageHead";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import type { Biz } from "@/lib/types";
 
 /** Kelola identitas toko yang tercetak di kepala invoice. */
 export function StoreSettingsView() {
-  const { db, updateBiz, toast } = useStore();
+  const { db, updateBiz, clearData, loadDemo, toast } = useStore();
   const [form, setForm] = useState<Biz>(db.biz);
+
+  // Ikuti data toko terbaru setelah dikosongkan atau dimuat ulang.
+  const [confirm, setConfirm] = useState<"demo" | "clear" | null>(null);
+  const [lastBiz, setLastBiz] = useState(db.biz);
+  if (db.biz !== lastBiz) {
+    setLastBiz(db.biz);
+    setForm(db.biz);
+  }
 
   const field = (key: keyof Biz) => ({
     "aria-label": key,
@@ -145,6 +154,53 @@ export function StoreSettingsView() {
           </div>
         </div>
       </div>
+
+      <div className="card p-5 mt-4">
+        <div
+          className="text-[11px] uppercase tracking-wider mb-1"
+          style={{ color: "var(--mu)" }}
+        >
+          Data toko
+        </div>
+        <p className="text-[12.5px] mb-3" style={{ color: "var(--mu)" }}>
+          Kosongkan semua data (produk, pelanggan, transaksi, pengguna) untuk
+          mulai memakai data asli toko Anda. Data tersimpan di browser ini.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="btn"
+            onClick={() => setConfirm("demo")}
+          >
+            Muat data contoh
+          </button>
+          <button
+            type="button"
+            className="btn d"
+            onClick={() => setConfirm("clear")}
+          >
+            Kosongkan semua data
+          </button>
+        </div>
+      </div>
+
+      <ConfirmDialog
+        open={confirm === "demo"}
+        onClose={() => setConfirm(null)}
+        title="Muat data contoh?"
+        description="Data yang ada sekarang akan diganti dengan data contoh."
+        confirmLabel="Muat data contoh"
+        onConfirm={loadDemo}
+      />
+      <ConfirmDialog
+        open={confirm === "clear"}
+        onClose={() => setConfirm(null)}
+        title="Kosongkan semua data?"
+        description="Semua produk, pelanggan, transaksi, dan pengguna di browser ini akan dihapus. Tindakan ini tidak bisa dibatalkan."
+        confirmLabel="Ya, hapus semua"
+        danger
+        onConfirm={clearData}
+      />
     </>
   );
 }

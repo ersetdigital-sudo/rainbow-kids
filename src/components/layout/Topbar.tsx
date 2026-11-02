@@ -46,7 +46,7 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
           <div className="tb-av">{initials}</div>
           <div className="tb-tx">
             <div className="tb-hi">Selamat datang,</div>
-            <div className="tb-nm">{active?.name}</div>
+            <div className="tb-nm">{active?.name ?? "Belum ada pengguna"}</div>
           </div>
         </div>
       </div>

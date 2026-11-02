@@ -26,7 +26,8 @@ import {
   activateBrowserSnapshot,
   getServerSnapshot,
   getSnapshot,
-  resetSnapshot,
+  loadDemoSnapshot,
+  clearSnapshot,
   setSnapshot,
   subscribe,
 } from "./persist";
@@ -139,9 +140,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
-  const resetDemo = useCallback(() => {
-    resetSnapshot();
-    toast("Data demo direset");
+  /** Hapus semua data supaya toko bisa mulai dengan data aslinya. */
+  const clearData = useCallback(() => {
+    clearSnapshot();
+    toast("Semua data dikosongkan");
+  }, [toast]);
+
+  /** Muat kembali data contoh untuk mencoba fitur. */
+  const loadDemo = useCallback(() => {
+    loadDemoSnapshot();
+    toast("Data contoh dimuat");
   }, [toast]);
 
   /* ---------------- Data toko ---------------- */
@@ -1627,12 +1635,22 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const inviteUser = useCallback<StoreValue["inviteUser"]>((u) => {
-    if (!u.name.trim()) return { ok: false, msg: "Isi nama" };
+    const name = u.name.trim();
+    const email = u.email.trim();
+    if (!name) return { ok: false, msg: "Isi nama" };
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+      return { ok: false, msg: "Format email tidak valid" };
+    const current = getSnapshot();
+    if (current.users.some((x) => x.email.toLowerCase() === email.toLowerCase()))
+      return { ok: false, msg: "Email itu sudah dipakai pengguna lain" };
+
     setSnapshot((prev) => ({
       ...prev,
-      users: [...prev.users, { ...u, name: u.name.trim(), active: true }],
+      users: [...prev.users, { name, email, role: u.role, active: true }],
+      // Pengguna pertama yang dibuat menjadi penanda pengguna aktif.
+      user: prev.user || (u.role === "Owner" ? `${name} (Owner)` : prev.user),
     }));
-    return { ok: true, msg: "Undangan disimulasikan" };
+    return { ok: true, msg: "Pengguna ditambahkan" };
   }, []);
 
   /** Ubah nama, email, dan role pengguna. Role Owner tidak bisa diturunkan. */
@@ -1689,7 +1707,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     () => ({
       db,
       toast,
-      resetDemo,
+      clearData,
+      loadDemo,
       updateBiz,
       addCustomer,
       requestCustomerEdit,
@@ -1718,7 +1737,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [
       db,
       toast,
-      resetDemo,
+      clearData,
+      loadDemo,
       updateBiz,
       addCustomer,
       requestCustomerEdit,
@@ -1764,7 +1784,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 type StoreValue = {
   db: DB;
   toast: (msg: string) => void;
-  resetDemo: () => void;
+  clearData: () => void;
+  loadDemo: () => void;
   updateBiz: (patch: Biz) => Result;
   addCustomer: (c: {
     name: string;

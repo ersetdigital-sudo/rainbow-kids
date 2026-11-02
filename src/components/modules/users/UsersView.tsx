@@ -126,7 +126,7 @@ export function UsersView() {
             className="btn p"
             onClick={() => setInviteOpen(true)}
           >
-            + Undang pengguna
+            + Tambah pengguna
           </button>
         }
       />
@@ -153,6 +153,7 @@ export function UsersView() {
           columns={columns}
           rows={db.users}
           rowKey={(u) => u.email}
+          emptyText="Belum ada pengguna — tambahkan Owner dulu"
         />
       </div>
 

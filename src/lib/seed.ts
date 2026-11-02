@@ -11,8 +11,31 @@ export const DEFAULT_PERMS: DB["perms"] = {
 };
 
 /**
+ * Ruang kerja kosong: tanpa data contoh, siap diisi data toko yang sebenarnya.
+ * Dipakai sebagai kondisi awal aplikasi.
+ */
+export function emptyDb(): DB {
+  return {
+    products: [],
+    customers: [],
+    suppliers: [],
+    sales: [],
+    purchases: [],
+    history: [],
+    approvals: [],
+    opnames: [],
+    expenses: [],
+    users: [],
+    perms: DEFAULT_PERMS,
+    biz: { name: "", addr: "", phone: "", email: "", npwp: "", bank: "" },
+    user: "",
+  };
+}
+
+/**
  * Data simulasi statis. Seed harus deterministik (tidak boleh pakai
  * Date.now/Math.random) supaya render server & client konsisten.
+ * Hanya dimuat lewat tombol "Muat data contoh" di Pengaturan Toko.
  */
 export function seed(): DB {
   const products: DB["products"] = [

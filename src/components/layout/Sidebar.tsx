@@ -16,7 +16,7 @@ export function Sidebar({
   collapsed?: boolean;
 }) {
   const pathname = usePathname();
-  const { db, resetDemo } = useStore();
+  const { db } = useStore();
   const pending = db.approvals.filter((a) => a.status === "Menunggu").length;
 
   const isActive = (href: string) =>
@@ -45,7 +45,7 @@ export function Sidebar({
           </svg>
         </div>
         <div className="side-brand">
-          <div className="side-nm">{db.biz.name}</div>
+          <div className="side-nm">{db.biz.name || "Toko Anda"}</div>
           <div className="side-sub">Kasir &amp; Inventory</div>
         </div>
       </div>
@@ -80,18 +80,10 @@ export function Sidebar({
       </nav>
 
       <div className="side-ft">
-        <div className="side-note">Mode demo · data tersimpan di browser</div>
-        <button
-          type="button"
-          className="side-reset"
-          onClick={() => {
-            if (window.confirm("Kembalikan semua data simulasi ke kondisi awal?")) {
-              resetDemo();
-            }
-          }}
-        >
-          Reset demo
-        </button>
+        <div className="side-note">Data tersimpan di browser ini</div>
+        <Link href="/settings" onClick={onClose} className="side-reset">
+          Atur data toko
+        </Link>
       </div>
     </aside>
   );

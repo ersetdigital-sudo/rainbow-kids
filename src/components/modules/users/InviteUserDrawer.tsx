@@ -12,10 +12,11 @@ export function InviteUserDrawer({
   open: boolean;
   onClose: () => void;
 }) {
-  const { inviteUser, toast } = useStore();
+  const { db, inviteUser, toast } = useStore();
+  const hasOwner = db.users.some((u) => u.role === "Owner");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<Role>("User");
+  const [role, setRole] = useState<Role>(hasOwner ? "User" : "Owner");
 
   const submit = () => {
     const res = inviteUser({ name, email, role });
@@ -28,28 +29,41 @@ export function InviteUserDrawer({
     }
   };
 
-  const ROLE_OPTIONS: { value: Role; label: string }[] = [
-    { value: "User", label: "User" },
-    { value: "Admin", label: "Admin" },
-    { value: "Approver", label: "Approver" },
-  ];
+  const ROLE_OPTIONS: { value: Role; label: string }[] =
+    hasOwner
+      ? [
+          { value: "User", label: "User" },
+          { value: "Admin", label: "Admin" },
+          { value: "Approver", label: "Approver" },
+        ]
+      : [
+          { value: "Owner", label: "Owner" },
+          { value: "User", label: "User" },
+          { value: "Admin", label: "Admin" },
+          { value: "Approver", label: "Approver" },
+        ];
 
   return (
     <Drawer
       open={open}
       onClose={onClose}
-      title="Undang pengguna"
+      title="Tambah pengguna"
       footer={
         <>
           <button type="button" className="btn" onClick={onClose}>
             Batal
           </button>
           <button type="button" className="btn p" onClick={submit}>
-            Kirim undangan
+            Simpan
           </button>
         </>
       }
     >
+      {!hasOwner && (
+        <div className="sim mb-3">
+          Belum ada Owner. Pengguna pertama yang dibuat sebaiknya ber-role Owner.
+        </div>
+      )}
       <div className="grid sm:grid-cols-3 gap-3">
         <div>
           <label className="f">Nama</label>
