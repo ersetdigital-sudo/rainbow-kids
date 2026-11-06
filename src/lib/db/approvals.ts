@@ -8,6 +8,8 @@ import type {
   Sale,
   SaleRequest,
   SaleRevision,
+  SupplierChange,
+  SupplierRequest,
 } from "../types";
 import {
   deleteRows,
@@ -21,10 +23,12 @@ import {
 /** Rincian usulan yang disimpan sebagai satu kolom jsonb. */
 type ApprovalDetail = {
   customerChanges?: CustomerChange[];
+  supplierChanges?: SupplierChange[];
   costChanges?: CostChange[];
   revision?: SaleRevision;
   saleRequest?: SaleRequest;
   purchaseRequest?: PurchaseRequest;
+  supplierRequest?: SupplierRequest;
   saleSnapshot?: Sale;
 };
 
@@ -40,6 +44,8 @@ type ApprovalRow = {
   purchase_id: string | null;
   customer_id: string | null;
   customer_name: string | null;
+  supplier_id: string | null;
+  supplier_name: string | null;
   reason: string | null;
   note: string | null;
   detail: ApprovalDetail | null;
@@ -65,14 +71,18 @@ function toRow(a: Approval, position: number): ApprovalRow {
     purchase_id: a.purchaseId ?? null,
     customer_id: a.customerId ?? null,
     customer_name: a.customerName ?? null,
+    supplier_id: a.supplierId ?? null,
+    supplier_name: a.supplierName ?? null,
     reason: a.reason ?? null,
     note: a.note ?? null,
     detail: {
       customerChanges: a.customerChanges,
+      supplierChanges: a.supplierChanges,
       costChanges: a.costChanges,
       revision: a.revision,
       saleRequest: a.saleRequest,
       purchaseRequest: a.purchaseRequest,
+      supplierRequest: a.supplierRequest,
       saleSnapshot: a.saleSnapshot,
     },
     user_name: a.user,
@@ -99,11 +109,15 @@ function toApproval(r: ApprovalRow): Approval {
     purchaseId: r.purchase_id ?? undefined,
     customerId: r.customer_id ?? undefined,
     customerName: r.customer_name ?? undefined,
+    supplierId: r.supplier_id ?? undefined,
+    supplierName: r.supplier_name ?? undefined,
     customerChanges: detail.customerChanges,
+    supplierChanges: detail.supplierChanges,
     costChanges: detail.costChanges,
     revision: detail.revision,
     saleRequest: detail.saleRequest,
     purchaseRequest: detail.purchaseRequest,
+    supplierRequest: detail.supplierRequest,
     saleSnapshot: detail.saleSnapshot,
     reason: r.reason ?? undefined,
     note: r.note ?? undefined,

@@ -47,8 +47,26 @@ export type Customer = {
   status?: CustomerStatus;
 };
 
+export type SupplierStatus = "Menunggu" | "Aktif" | "Diarsipkan";
+
 export type Supplier = {
   id: string;
+  name: string;
+  phone?: string;
+  address?: string;
+  /** Opsional; data lama tanpa status dianggap "Aktif". */
+  status?: SupplierStatus;
+};
+
+/** Satu field data supplier yang diusulkan berubah lewat approval. */
+export type SupplierChange = {
+  field: "name" | "phone" | "address";
+  before: string;
+  after: string;
+};
+
+/** Usulan supplier baru — baru tercatat setelah disetujui Owner/Approver. */
+export type SupplierRequest = {
   name: string;
   phone?: string;
   address?: string;
@@ -131,6 +149,9 @@ export type ApprovalKind =
   | "customer"
   | "customerEdit"
   | "customerDelete"
+  | "supplier"
+  | "supplierEdit"
+  | "supplierDelete"
   | "saleDelete";
 
 /** Satu field data toko yang diusulkan berubah lewat approval. */
@@ -206,7 +227,14 @@ export type Approval = {
   customerName?: string;
   /** Perbandingan sebelum & sesudah untuk kind "customerEdit". */
   customerChanges?: CustomerChange[];
-  /** Alasan pengajuan hapus toko / order. */
+  /** Supplier terkait approval kind "supplier" / "supplierEdit" / "supplierDelete". */
+  supplierId?: string;
+  supplierName?: string;
+  /** Perbandingan sebelum & sesudah untuk kind "supplierEdit". */
+  supplierChanges?: SupplierChange[];
+  /** Rincian usulan supplier baru untuk kind "supplier". */
+  supplierRequest?: SupplierRequest;
+  /** Alasan pengajuan hapus toko / supplier / order. */
   reason?: string;
   /** Snapshot penjualan saat pengajuan hapus order. */
   saleSnapshot?: Sale;

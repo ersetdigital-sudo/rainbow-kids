@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { formatDate, TODAY } from "@/lib/date";
 import { rp, initials } from "@/lib/format";
-import { lastPurchaseOf, purchaseTotal, variantLabel } from "@/lib/calc";
+import { lastPurchaseOf, purchaseTotal, supplierStatus, variantLabel } from "@/lib/calc";
 import { useStore, type PurchaseDraft } from "@/lib/store";
 import type { Purchase } from "@/lib/types";
 import { Badge } from "@/components/ui/Badge";
@@ -32,6 +32,15 @@ export function PurchaseFormDrawer({
   );
   const [pickerOpen, setPickerOpen] = useState(false);
 
+  /** Supplier baru yang masih menunggu approval (belum ada di db.suppliers). */
+  const pendingSuppliers = useMemo(
+    () =>
+      db.approvals.filter(
+        (a) => a.kind === "supplier" && a.status === "Menunggu",
+      ),
+    [db.approvals],
+  );
+
   // State di-reset lewat remount (parent memberi key berbeda tiap dibuka).
   const [draft, setDraft] = useState<PurchaseDraft>(() =>
     purchase
@@ -49,6 +58,10 @@ export function PurchaseFormDrawer({
             ? [{ vid: variants[0].id, qty: 10, cost: variants[0].cost }]
             : [],
         },
+  );
+  const selectedPending = pendingSuppliers.some(
+    (a) =>
+      (a.supplierRequest?.name ?? a.supplierName ?? "") === draft.supplier,
   );
 
   const total = draft.items.reduce((a, i) => a + i.qty * i.cost, 0);
@@ -115,9 +128,15 @@ export function PurchaseFormDrawer({
               onClick={() => setPickerOpen(true)}
             >
               <span
+                className="flex items-center gap-2 min-w-0 text-left"
                 style={draft.supplier ? undefined : { color: "var(--mu)" }}
               >
-                {draft.supplier || "Pilih supplier..."}
+                <span className="truncate">
+                  {draft.supplier || "Pilih supplier..."}
+                </span>
+                {selectedPending && (
+                  <span className="bd b-wa flex-none">Menunggu approval</span>
+                )}
               </span>
               <span aria-hidden="true">▾</span>
             </button>
@@ -258,11 +277,25 @@ export function PurchaseFormDrawer({
         onClose={() => setPickerOpen(false)}
         title="Supplier"
         value={draft.supplier}
-        options={db.suppliers.map((s) => ({
-          id: s.id,
-          name: s.name,
-          sub: s.phone,
-        }))}
+        options={[
+          ...pendingSuppliers.map((a) => ({
+            id: a.supplierId ?? `pending-${a.id}`,
+            name: a.supplierRequest?.name ?? a.supplierName ?? "",
+            sub: a.supplierRequest?.phone,
+            badges: <span className="bd b-wa">Menunggu approval</span>,
+          })),
+          ...db.suppliers
+            .filter((s) => supplierStatus(s) !== "Diarsipkan")
+            .map((s) => ({
+              id: s.id,
+              name: s.name,
+              sub: s.phone,
+              badges:
+                supplierStatus(s) === "Menunggu" ? (
+                  <span className="bd b-wa">Menunggu approval</span>
+                ) : undefined,
+            })),
+        ]}
         onSelect={(o) => setDraft((d) => ({ ...d, supplier: o.name }))}
         onCreate={(name) => {
           const res = addSupplier({ name });

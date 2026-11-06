@@ -20,7 +20,11 @@ form yang jadi bottom sheet di layar kecil.
    `user_metadata` ke `app_metadata`, memperketat RLS (`role_permissions`/`store_settings`
    hanya Owner, keputusan approval hanya Approver/Owner), dan mencabut `EXECUTE`
    `public.rls_auto_enable()` dari `anon`/`authenticated`. Aman dijalankan ulang.
-   **Urutan yang benar: schema.sql → migration-002 → migration-003.**
+   Terakhir jalankan `supabase/migration-004-supplier-approval.sql`: menambah kolom
+   `suppliers.status` + `approvals.supplier_id/supplier_name`, membuang fallback role ke
+   `user_metadata` (akun tanpa role = User), dan mengatur RLS supplier (baca semua pengguna
+   login, tulis hanya Owner/Approver). Aman dijalankan ulang.
+   **Urutan yang benar: schema.sql → migration-002 → migration-003 → migration-004.**
    Skrip ini membuat tabel relasional: `products` + `product_variants`, `customers`,
    `suppliers`, `sales` + `sale_items` + `sale_payments`, `purchases` + `purchase_items`,
    `opnames` + `opname_lines`, `approvals`, `stock_history`, `expenses`,

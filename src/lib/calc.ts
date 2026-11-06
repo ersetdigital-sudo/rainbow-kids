@@ -10,6 +10,7 @@ import type {
   Sale,
   SaleItem,
   SaleRequest,
+  SupplierStatus,
   Variant,
 } from "./types";
 
@@ -53,6 +54,11 @@ export function arStatus(s: Sale, today = TODAY): ArStatus {
 export const customerStatus = (customer: {
   status?: CustomerStatus;
 }): CustomerStatus => customer.status ?? "Aktif";
+
+/** Status supplier; data lama tanpa status dianggap aktif. */
+export const supplierStatus = (supplier: {
+  status?: SupplierStatus;
+}): SupplierStatus => supplier.status ?? "Aktif";
 
 /** Cocokkan sale ke toko lewat ID, atau nama untuk data lama. */
 export function saleBelongsToCustomer(

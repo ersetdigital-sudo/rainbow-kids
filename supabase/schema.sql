@@ -85,6 +85,7 @@ create table if not exists public.suppliers (
   name text not null,
   phone text,
   address text,
+  status text,
   position integer not null default 0,
   created_at timestamptz not null default now()
 );
@@ -201,9 +202,12 @@ create table if not exists public.approvals (
   purchase_id text,
   customer_id text,
   customer_name text,
+  supplier_id text,
+  supplier_name text,
   reason text,
   note text,
-  -- Rincian usulan: saleRequest, purchaseRequest, revision, changes, snapshot.
+  -- Rincian usulan: saleRequest, purchaseRequest, supplierRequest,
+  -- revision, changes, snapshot.
   detail jsonb,
   user_name text,
   time text,
@@ -306,22 +310,22 @@ create index if not exists opname_lines_vid_idx on public.opname_lines (vid);
 -- (role "authenticated") boleh baca & tulis data operasional. Tamu (anon)
 -- tidak dapat apa pun.
 --
--- Pengecualian (lihat juga supabase/migration-003-security.sql):
+-- Pengecualian (lihat juga supabase/migration-003-security.sql dan
+-- supabase/migration-004-supplier-approval.sql):
 -- * role_permissions & store_settings hanya boleh ditulis Owner.
 -- * approvals boleh dibuat semua pengguna, keputusannya hanya Approver/Owner.
+-- * suppliers hanya boleh ditulis Owner/Approver (Admin/User lewat approval).
 -- ---------------------------------------------------------------------------
 
 -- Role dibaca dari app_metadata (hanya service role yang bisa menulis).
+-- Akun tanpa role di app_metadata dianggap role paling rendah (User).
 create or replace function public.current_app_role()
 returns text
 language sql
 stable
 set search_path = ''
 as $$
-  select coalesce(
-    nullif(auth.jwt() -> 'app_metadata' ->> 'role', ''),
-    nullif(auth.jwt() -> 'user_metadata' ->> 'role', '')
-  );
+  select coalesce(nullif(auth.jwt() -> 'app_metadata' ->> 'role', ''), 'User');
 $$;
 
 revoke all on function public.current_app_role() from public;
@@ -342,7 +346,7 @@ begin
   for t in
     select unnest(array[
       'products', 'product_variants',
-      'customers', 'suppliers', 'sales', 'sale_items', 'sale_payments',
+      'customers', 'sales', 'sale_items', 'sale_payments',
       'purchases', 'purchase_items', 'opnames', 'opname_lines',
       'stock_history', 'expenses'
     ])
@@ -355,6 +359,23 @@ begin
     );
   end loop;
 end $$;
+
+-- Supplier: baca semua pengguna login, tulis hanya Owner & Approver.
+-- Admin/User mengirim pengajuan lewat tabel approvals (bukan menulis suppliers).
+alter table public.suppliers enable row level security;
+
+drop policy if exists "toko akses penuh" on public.suppliers;
+drop policy if exists "supplier dibaca semua" on public.suppliers;
+drop policy if exists "supplier ditulis penyetuju" on public.suppliers;
+
+create policy "supplier dibaca semua" on public.suppliers
+  for select to authenticated
+  using (true);
+
+create policy "supplier ditulis penyetuju" on public.suppliers
+  for all to authenticated
+  using (public.current_app_role() in ('Owner', 'Approver'))
+  with check (public.current_app_role() in ('Owner', 'Approver'));
 
 -- Pengaturan toko & matriks hak akses: baca semua pengguna, tulis hanya Owner.
 do $$

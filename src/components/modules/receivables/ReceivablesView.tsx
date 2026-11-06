@@ -14,6 +14,7 @@ import { PayDrawer } from "./PayDrawer";
 import type { ArStatus, Sale } from "@/lib/types";
 
 const STATUSES: (ArStatus | "")[] = [
+  "Belum Lunas",
   "Belum jatuh tempo",
   "Jatuh tempo",
   "Terlambat",
@@ -21,8 +22,9 @@ const STATUSES: (ArStatus | "")[] = [
   "Lunas",
 ];
 
-/** Legenda ringkasan tagihan: tiga status berjalan + lunas. */
+/** Legenda ringkasan tagihan: status berjalan + lunas. */
 const LEGEND: { st: ArStatus; color: string }[] = [
+  { st: "Belum Lunas", color: "#64748B" },
   { st: "Belum jatuh tempo", color: "#FEC40B" },
   { st: "Jatuh tempo", color: "#F59E0B" },
   { st: "Terlambat", color: "#EF4444" },
@@ -44,14 +46,12 @@ export function ReceivablesView() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [payId, setPayId] = useState<string | null>(null);
 
-  const tempoSales = useMemo(
-    () => db.sales.filter((s) => s.type === "tempo"),
-    [db.sales],
-  );
+  /** Semua invoice (COD & tempo) ikut dihitung sebagai piutang. */
+  const invoices = useMemo(() => db.sales, [db.sales]);
 
   const list = useMemo(
     () =>
-      tempoSales
+      invoices
         .filter((s) => {
           const q = query.trim().toLowerCase();
           const matchQuery =
@@ -65,25 +65,30 @@ export function ReceivablesView() {
         })
         .slice()
         .reverse(),
-    [tempoSales, filter, from, to, query],
+    [invoices, filter, from, to, query],
   );
 
-  const byStatus = (st: ArStatus) => tempoSales.filter((s) => arStatus(s) === st);
+  const byStatus = (st: ArStatus) => invoices.filter((s) => arStatus(s) === st);
   const remaining = (rows: Sale[]) =>
     rows.reduce((x, s) => x + saleTotal(s) - salePaid(s), 0);
 
   /** Tagihan yang masih berjalan (belum lunas) untuk ringkasan total. */
   const openStatuses: ArStatus[] = [
+    "Belum Lunas",
     "Belum jatuh tempo",
     "Jatuh tempo",
     "Terlambat",
+    "Menunggu Pelunasan",
   ];
-  const openRows = tempoSales.filter((s) => openStatuses.includes(arStatus(s)));
+  const openRows = invoices.filter((s) => openStatuses.includes(arStatus(s)));
   const totalOpen = remaining(openRows);
 
-  const totalTempo = tempoSales.reduce((x, s) => x + saleTotal(s), 0);
-  const collected = tempoSales.reduce((x, s) => x + salePaid(s), 0);
-  const pctCollected = totalTempo ? Math.round((collected / totalTempo) * 100) : 0;
+  /** Total tagihan (seluruh invoice) jadi dasar bar legenda & progress. */
+  const totalBilled = invoices.reduce((x, s) => x + saleTotal(s), 0);
+  const collected = invoices.reduce((x, s) => x + salePaid(s), 0);
+  const pctCollected = totalBilled
+    ? Math.round((collected / totalBilled) * 100)
+    : 0;
 
   const legendValue = (st: ArStatus) =>
     st === "Lunas"
@@ -151,7 +156,12 @@ export function ReceivablesView() {
       key: "due",
       label: "Jatuh tempo",
       render: (s) => {
-        const late = s.due ? dayDiff(s.due) : 0;
+        // COD tidak punya jatuh tempo: statusnya tetap "Belum Lunas".
+        if (!s.due)
+          return (
+            <span style={{ color: "var(--mu)" }}>Tanpa jatuh tempo (COD)</span>
+          );
+        const late = dayDiff(s.due);
         return (
           <div>
             <div>{formatDate(s.due)}</div>
@@ -231,7 +241,7 @@ export function ReceivablesView() {
     <>
       <PageHead
         title="Piutang & Pembayaran"
-        subtitle="Pantau tagihan tempo, catat pembayaran sebagian, dan ajukan pelunasan ke Owner."
+        subtitle="Pantau tagihan COD & tempo, catat pembayaran sebagian, dan ajukan pelunasan ke Owner."
         actions={
           <button
             type="button"
@@ -271,10 +281,9 @@ export function ReceivablesView() {
           {LEGEND.map((l) => {
             const rows = byStatus(l.st);
             const value = legendValue(l.st);
-            const share =
-              l.st === "Lunas" || totalOpen <= 0
-                ? 0
-                : Math.min((value / totalOpen) * 100, 100);
+            const share = totalBilled
+              ? Math.min((value / totalBilled) * 100, 100)
+              : 0;
             const on = filter === l.st;
             return (
               <button
@@ -307,10 +316,10 @@ export function ReceivablesView() {
         <div className="ar-listhead">
           <div>
             <div className="font-bold" style={{ color: "var(--nv)" }}>
-              Daftar tagihan tempo
+              Daftar tagihan
             </div>
             <div className="text-xs" style={{ color: "var(--mu)" }}>
-              {list.length} dari {tempoSales.length} invoice tempo
+              {list.length} dari {invoices.length} invoice (COD &amp; tempo)
             </div>
           </div>
           <span className="ar-note">Pelunasan butuh approval Owner</span>
@@ -376,7 +385,7 @@ export function ReceivablesView() {
             className={filter === "" ? "on" : undefined}
             onClick={() => setFilter("")}
           >
-            Semua <b>{tempoSales.length}</b>
+            Semua <b>{invoices.length}</b>
           </button>
           {STATUSES.map((st) => (
             <button

@@ -30,7 +30,9 @@ import {
   saleProfit,
   saleProposed,
   saleTotal,
+  supplierStatus,
 } from "./calc";
+import { canWriteSupplier } from "./access";
 import { compareOpname } from "./opname";
 import {
   activateBrowserSnapshot,
@@ -59,6 +61,7 @@ import type {
   SaleRevision,
   SaleType,
   Supplier,
+  SupplierChange,
 } from "./types";
 
 export type SaleDraft = {
@@ -135,6 +138,15 @@ function hasPendingSaleDelete(
       a.saleId === saleId &&
       a.status === "Menunggu",
   );
+}
+
+/** Apakah supplier sudah dipakai di nota pembelian (riwayat harus tetap utuh). */
+function supplierHasPurchases(
+  purchases: DB["purchases"],
+  supplier: Supplier,
+): boolean {
+  const name = supplier.name.trim().toLowerCase();
+  return purchases.some((p) => p.supplier.trim().toLowerCase() === name);
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -527,20 +539,266 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return { ok: true, msg: "Pengajuan hapus toko dikirim ke Owner" };
   }, []);
 
+  /**
+   * Tambah supplier. Owner/Approver langsung tersimpan; User/Admin menjadi
+   * pengajuan yang baru tercatat setelah disetujui (sama seperti toko baru).
+   */
   const addSupplier = useCallback<StoreValue["addSupplier"]>(
     (s) => {
       const name = s.name.trim();
       if (!name) return { ok: false, msg: "Isi nama supplier" };
-      const exists = getSnapshot().suppliers.some(
-        (x) => x.name.toLowerCase() === name.toLowerCase(),
-      );
-      if (exists) return { ok: false, msg: "Supplier dengan nama itu sudah ada" };
-      const supplier: Supplier = { id: uid("s"), name };
-      setSnapshot((prev) => ({ ...prev, suppliers: [...prev.suppliers, supplier] }));
+      const current = getSnapshot();
+      const duplicate =
+        current.suppliers.some(
+          (x) => x.name.toLowerCase() === name.toLowerCase(),
+        ) ||
+        current.approvals.some(
+          (a) =>
+            a.kind === "supplier" &&
+            a.status === "Menunggu" &&
+            (a.supplierRequest?.name ?? a.supplierName ?? "").toLowerCase() ===
+              name.toLowerCase(),
+        );
+      if (duplicate)
+        return { ok: false, msg: "Supplier dengan nama itu sudah ada" };
+
+      const phone = s.phone?.trim() || undefined;
+      const address = s.address?.trim() || undefined;
+      const supplier: Supplier = {
+        id: uid("s"),
+        name,
+        phone,
+        address,
+        status: "Aktif",
+      };
+
+      if (!canWriteSupplier(current)) {
+        const pending: Supplier = { ...supplier, status: "Menunggu" };
+        const time = nowStamp();
+        setSnapshot((prev) => ({
+          ...prev,
+          approvals: [
+            ...prev.approvals,
+            {
+              id: nextId(prev.approvals.map((a) => a.id), "AP-"),
+              kind: "supplier" as const,
+              type: "Supplier baru",
+              before: "—",
+              after: "Menunggu",
+              supplierId: pending.id,
+              supplierName: pending.name,
+              supplierRequest: { name, phone, address },
+              user: prev.user,
+              time,
+              status: "Menunggu" as const,
+            },
+          ],
+        }));
+        return {
+          ok: true,
+          msg: `Supplier ${name} diajukan — menunggu approval Owner/Approver`,
+          supplier: pending,
+        };
+      }
+
+      setSnapshot((prev) => ({
+        ...prev,
+        suppliers: [...prev.suppliers, supplier],
+      }));
       return { ok: true, msg: `Supplier ${name} ditambahkan`, supplier };
     },
     [],
   );
+
+  /**
+   * Ubah data supplier (nama, HP, alamat). Owner/Approver langsung tersimpan;
+   * User/Admin mengirim pengajuan sebelum & sesudah.
+   */
+  const requestSupplierEdit = useCallback<StoreValue["requestSupplierEdit"]>(
+    (id, patch) => {
+      const name = patch.name.trim();
+      if (!name) return { ok: false, msg: "Isi nama supplier" };
+      const current = getSnapshot();
+      const supplier = current.suppliers.find((s) => s.id === id);
+      if (!supplier) return { ok: false, msg: "Supplier tidak ditemukan" };
+      if (
+        current.suppliers.some(
+          (s) => s.id !== id && s.name.toLowerCase() === name.toLowerCase(),
+        )
+      )
+        return { ok: false, msg: "Supplier dengan nama itu sudah ada" };
+      if (
+        current.approvals.some(
+          (a) =>
+            a.kind === "supplierEdit" &&
+            a.supplierId === id &&
+            a.status === "Menunggu",
+        )
+      )
+        return {
+          ok: false,
+          msg: "Perubahan supplier ini masih menunggu approval",
+        };
+
+      const phone = patch.phone?.trim() ?? "";
+      const address = patch.address?.trim() ?? "";
+      const changes: SupplierChange[] = [];
+      if (name !== supplier.name)
+        changes.push({ field: "name", before: supplier.name, after: name });
+      if (phone !== (supplier.phone ?? ""))
+        changes.push({
+          field: "phone",
+          before: supplier.phone ?? "",
+          after: phone,
+        });
+      if (address !== (supplier.address ?? ""))
+        changes.push({
+          field: "address",
+          before: supplier.address ?? "",
+          after: address,
+        });
+      if (!changes.length) return { ok: false, msg: "Tidak ada perubahan" };
+
+      const applyChanges = (prev: DB): DB => {
+        const nextName = changes.find((c) => c.field === "name")?.after;
+        const nextPhone = changes.find((c) => c.field === "phone")?.after;
+        const nextAddress = changes.find((c) => c.field === "address")?.after;
+        return {
+          ...prev,
+          suppliers: prev.suppliers.map((s) =>
+            s.id === id
+              ? {
+                  ...s,
+                  name: nextName ?? s.name,
+                  phone:
+                    nextPhone !== undefined
+                      ? nextPhone || undefined
+                      : s.phone,
+                  address:
+                    nextAddress !== undefined
+                      ? nextAddress || undefined
+                      : s.address,
+                }
+              : s,
+          ),
+          // Nama supplier di nota lama ikut diperbarui agar rekap konsisten.
+          purchases: nextName
+            ? prev.purchases.map((p) =>
+                p.supplier.trim().toLowerCase() ===
+                supplier.name.trim().toLowerCase()
+                  ? { ...p, supplier: nextName }
+                  : p,
+              )
+            : prev.purchases,
+        };
+      };
+
+      if (canWriteSupplier(current)) {
+        setSnapshot((prev) => applyChanges(prev));
+        return { ok: true, msg: "Data supplier diperbarui" };
+      }
+
+      const time = nowStamp();
+      setSnapshot((prev) => ({
+        ...prev,
+        approvals: [
+          ...prev.approvals,
+          {
+            id: nextId(prev.approvals.map((a) => a.id), "AP-"),
+            kind: "supplierEdit" as const,
+            type: "Ubah supplier",
+            before: supplier.name,
+            after: name,
+            supplierId: id,
+            supplierName: supplier.name,
+            supplierChanges: changes,
+            user: prev.user,
+            time,
+            status: "Menunggu" as const,
+          },
+        ],
+      }));
+      return {
+        ok: true,
+        msg: "Pengajuan ubah supplier dikirim ke Owner/Approver",
+      };
+    },
+    [],
+  );
+
+  /**
+   * Hapus supplier. Owner/Approver langsung; User/Admin lewat pengajuan.
+   * Supplier yang sudah dipakai di pembelian hanya diarsipkan, bukan dihapus.
+   */
+  const requestSupplierDelete = useCallback<
+    StoreValue["requestSupplierDelete"]
+  >((supplierId, reason) => {
+    const current = getSnapshot();
+    const supplier = current.suppliers.find((s) => s.id === supplierId);
+    if (!supplier) return { ok: false, msg: "Supplier tidak ditemukan" };
+    if (
+      current.approvals.some(
+        (a) =>
+          a.kind === "supplierDelete" &&
+          a.supplierId === supplierId &&
+          a.status === "Menunggu",
+      )
+    )
+      return {
+        ok: false,
+        msg: "Sudah ada pengajuan hapus yang menunggu untuk supplier ini",
+      };
+
+    const used = supplierHasPurchases(current.purchases, supplier);
+    const applyDelete = (prev: DB): DB => ({
+      ...prev,
+      suppliers: used
+        ? prev.suppliers.map((s) =>
+            s.id === supplierId
+              ? { ...s, status: "Diarsipkan" as const }
+              : s,
+          )
+        : prev.suppliers.filter((s) => s.id !== supplierId),
+    });
+
+    if (canWriteSupplier(current)) {
+      setSnapshot((prev) => applyDelete(prev));
+      return {
+        ok: true,
+        msg: used
+          ? "Supplier diarsipkan — riwayat pembelian tetap tersimpan"
+          : "Supplier dihapus",
+      };
+    }
+
+    const note = reason.trim();
+    if (!note) return { ok: false, msg: "Isi alasan hapus supplier" };
+
+    const time = nowStamp();
+    setSnapshot((prev) => ({
+      ...prev,
+      approvals: [
+        ...prev.approvals,
+        {
+          id: nextId(prev.approvals.map((a) => a.id), "AP-"),
+          kind: "supplierDelete" as const,
+          type: "Hapus supplier",
+          before: supplierStatus(supplier),
+          after: used ? "Diarsipkan" : "Dihapus",
+          supplierId,
+          supplierName: supplier.name,
+          reason: note,
+          user: prev.user,
+          time,
+          status: "Menunggu" as const,
+        },
+      ],
+    }));
+    return {
+      ok: true,
+      msg: "Pengajuan hapus supplier dikirim ke Owner/Approver",
+    };
+  }, []);
 
   /* ---------------- Penjualan ---------------- */
 
@@ -1349,6 +1607,128 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
+      // Supplier baru — disetujui baru dibuat; ditolak tidak dipakai.
+      if (a.kind === "supplier") {
+        const mark = (note?: string) =>
+          prev.approvals.map((x) =>
+            x.id === id
+              ? {
+                  ...x,
+                  status: ok ? ("Disetujui" as const) : ("Ditolak" as const),
+                  by: prev.user,
+                  decidedAt,
+                  ...(note ? { note } : {}),
+                }
+              : x,
+          );
+        const req = a.supplierRequest;
+        if (!ok || !req || !a.supplierId)
+          return { ...prev, approvals: mark() };
+
+        const duplicate = prev.suppliers.some(
+          (s) => s.name.toLowerCase() === req.name.toLowerCase(),
+        );
+        if (duplicate)
+          return {
+            ...prev,
+            approvals: mark("Supplier dengan nama itu sudah ada"),
+          };
+
+        const supplier: Supplier = {
+          id: a.supplierId,
+          name: req.name,
+          phone: req.phone,
+          address: req.address,
+          status: "Aktif",
+        };
+        return {
+          ...prev,
+          suppliers: [...prev.suppliers, supplier],
+          approvals: mark(),
+        };
+      }
+
+      // Ubah supplier — baru diterapkan setelah disetujui.
+      if (a.kind === "supplierEdit") {
+        const mark = () =>
+          prev.approvals.map((x) =>
+            x.id === id
+              ? {
+                  ...x,
+                  status: ok ? ("Disetujui" as const) : ("Ditolak" as const),
+                  by: prev.user,
+                  decidedAt,
+                }
+              : x,
+          );
+        const changes = a.supplierChanges ?? [];
+        const supplier = prev.suppliers.find((s) => s.id === a.supplierId);
+        if (!ok || !supplier || !changes.length)
+          return { ...prev, approvals: mark() };
+
+        const nextName = changes.find((c) => c.field === "name")?.after;
+        const nextPhone = changes.find((c) => c.field === "phone")?.after;
+        const nextAddress = changes.find((c) => c.field === "address")?.after;
+        return {
+          ...prev,
+          suppliers: prev.suppliers.map((s) =>
+            s.id === supplier.id
+              ? {
+                  ...s,
+                  name: nextName ?? s.name,
+                  phone:
+                    nextPhone !== undefined
+                      ? nextPhone || undefined
+                      : s.phone,
+                  address:
+                    nextAddress !== undefined
+                      ? nextAddress || undefined
+                      : s.address,
+                }
+              : s,
+          ),
+          purchases: nextName
+            ? prev.purchases.map((p) =>
+                p.supplier.trim().toLowerCase() ===
+                supplier.name.trim().toLowerCase()
+                  ? { ...p, supplier: nextName }
+                  : p,
+              )
+            : prev.purchases,
+          approvals: mark(),
+        };
+      }
+
+      // Hapus supplier — arsipkan bila sudah dipakai di pembelian.
+      if (a.kind === "supplierDelete") {
+        const mark = () =>
+          prev.approvals.map((x) =>
+            x.id === id
+              ? {
+                  ...x,
+                  status: ok ? ("Disetujui" as const) : ("Ditolak" as const),
+                  by: prev.user,
+                  decidedAt,
+                }
+              : x,
+          );
+        const supplier = prev.suppliers.find((s) => s.id === a.supplierId);
+        if (!ok || !supplier) return { ...prev, approvals: mark() };
+
+        const used = supplierHasPurchases(prev.purchases, supplier);
+        return {
+          ...prev,
+          suppliers: used
+            ? prev.suppliers.map((s) =>
+                s.id === supplier.id
+                  ? { ...s, status: "Diarsipkan" as const }
+                  : s,
+              )
+            : prev.suppliers.filter((s) => s.id !== supplier.id),
+          approvals: mark(),
+        };
+      }
+
       // Ubah data toko — baru diterapkan setelah disetujui Owner.
       if (a.kind === "customerEdit") {
         const changes = a.customerChanges ?? [];
@@ -2058,6 +2438,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       requestCustomerEdit,
       requestCustomerDelete,
       addSupplier,
+      requestSupplierEdit,
+      requestSupplierDelete,
       saveSale,
       requestSaleRevision,
       recordPayment,
@@ -2095,6 +2477,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       requestCustomerEdit,
       requestCustomerDelete,
       addSupplier,
+      requestSupplierEdit,
+      requestSupplierDelete,
       saveSale,
       requestSaleRevision,
       recordPayment,
@@ -2164,6 +2548,11 @@ type StoreValue = {
   ) => Result;
   requestCustomerDelete: (customerId: string, reason: string) => Result;
   addSupplier: (s: { name: string; phone?: string; address?: string }) => Result;
+  requestSupplierEdit: (
+    id: string,
+    patch: { name: string; phone?: string; address?: string },
+  ) => Result;
+  requestSupplierDelete: (supplierId: string, reason: string) => Result;
   saveSale: (draft: SaleDraft) => Result;
   requestSaleRevision: (saleId: string, revision: SaleRevision) => Result;
   recordPayment: (

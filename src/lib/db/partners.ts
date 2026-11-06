@@ -1,4 +1,10 @@
-import type { Customer, CustomerStatus, CustomerType, Supplier } from "../types";
+import type {
+  Customer,
+  CustomerStatus,
+  CustomerType,
+  Supplier,
+  SupplierStatus,
+} from "../types";
 import { deleteRows, diffRows, selectAll, upsertRows, type Row } from "./client";
 
 type CustomerRow = {
@@ -51,6 +57,7 @@ type SupplierRow = {
   name: string;
   phone: string | null;
   address: string | null;
+  status: string | null;
   position: number;
 };
 
@@ -61,6 +68,7 @@ export async function loadSuppliers(): Promise<Supplier[]> {
     name: r.name,
     phone: r.phone ?? undefined,
     address: r.address ?? undefined,
+    status: (r.status ?? undefined) as SupplierStatus | undefined,
   }));
 }
 
@@ -74,6 +82,7 @@ export async function saveSuppliers(
       name: s.name,
       phone: s.phone ?? null,
       address: s.address ?? null,
+      status: s.status ?? null,
       position: index,
     }));
 

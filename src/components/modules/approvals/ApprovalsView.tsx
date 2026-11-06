@@ -22,6 +22,9 @@ const DETAIL_KINDS = new Set<Approval["kind"]>([
   "customer",
   "customerEdit",
   "customerDelete",
+  "supplier",
+  "supplierEdit",
+  "supplierDelete",
   "saleDelete",
 ]);
 
@@ -80,6 +83,18 @@ export function ApprovalsView({ focusId = null }: { focusId?: string | null }) {
         "-"
       );
     }
+    if (
+      a.kind === "supplier" ||
+      a.kind === "supplierEdit" ||
+      a.kind === "supplierDelete"
+    ) {
+      return (
+        a.supplierName ??
+        a.supplierRequest?.name ??
+        db.suppliers.find((s) => s.id === a.supplierId)?.name ??
+        "-"
+      );
+    }
     if (a.kind === "saleDelete") {
       const s = db.sales.find((x) => x.id === a.saleId);
       if (a.saleSnapshot)
@@ -107,6 +122,9 @@ export function ApprovalsView({ focusId = null }: { focusId?: string | null }) {
       a.kind === "customer" ||
       a.kind === "customerEdit" ||
       a.kind === "customerDelete" ||
+      a.kind === "supplier" ||
+      a.kind === "supplierEdit" ||
+      a.kind === "supplierDelete" ||
       a.kind === "saleDelete"
     )
       return typeof v === "number" ? rp(v) : String(v);
@@ -141,7 +159,8 @@ export function ApprovalsView({ focusId = null }: { focusId?: string | null }) {
       render: (a) => (
         <span style={{ color: "var(--mu)" }}>
           {a.kind === "invoice" ||
-          (a.kind === "customer" && a.before === "—") ? (
+          ((a.kind === "customer" || a.kind === "supplier") &&
+            a.before === "—") ? (
             "—"
           ) : (
             <s>{fmt(a, a.before)}</s>
@@ -229,9 +248,15 @@ export function ApprovalsView({ focusId = null }: { focusId?: string | null }) {
                                   ? "Perubahan data toko disetujui & diterapkan"
                                   : a.kind === "customerDelete"
                                   ? "Pengajuan hapus toko disetujui"
-                                  : a.kind === "saleDelete"
-                                    ? "Order dihapus — stok dikembalikan"
-                                    : "Perubahan disetujui & diterapkan",
+                                  : a.kind === "supplier"
+                                    ? "Supplier disetujui — status Aktif"
+                                    : a.kind === "supplierEdit"
+                                      ? "Perubahan data supplier disetujui & diterapkan"
+                                      : a.kind === "supplierDelete"
+                                        ? "Pengajuan hapus supplier disetujui"
+                                        : a.kind === "saleDelete"
+                                          ? "Order dihapus — stok dikembalikan"
+                                          : "Perubahan disetujui & diterapkan",
                   );
                 }}
               >

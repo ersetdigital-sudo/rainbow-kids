@@ -139,6 +139,14 @@ export function DashboardView() {
       "#7A5800",
     ],
     [
+      "Belum Lunas (COD)",
+      sum(
+        open.filter((s) => arStatus(s) === "Belum Lunas"),
+        (s) => saleTotal(s) - salePaid(s),
+      ),
+      "#64748B",
+    ],
+    [
       "Belum jatuh tempo",
       sum(
         open.filter((s) => arStatus(s) === "Belum jatuh tempo"),

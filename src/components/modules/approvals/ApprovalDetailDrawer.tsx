@@ -12,6 +12,7 @@ import {
   salePaid,
   saleRequestPosition,
   saleTotal,
+  supplierStatus,
   variantLabel,
 } from "@/lib/calc";
 import { useStore } from "@/lib/store";
@@ -20,7 +21,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Drawer } from "@/components/ui/Drawer";
 import { Icon } from "@/components/ui/Icon";
 import { OverdueWarningDialog } from "@/components/ui/OverdueWarningDialog";
-import type { Approval, CustomerChange } from "@/lib/types";
+import type { Approval, CustomerChange, SupplierChange } from "@/lib/types";
 
 function DecisionFooter({
   approval,
@@ -306,6 +307,271 @@ export function ApprovalDetailDrawer({
 
         <div className="sim">
           Disetujui: {hasSales ? "toko diarsipkan karena sudah punya transaksi." : "toko dihapus permanen karena belum pernah transaksi."} Ditolak: data toko tetap seperti semula.
+        </div>
+
+        <div className="text-[13px] px-1 mt-3">
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>Diajukan</span>
+            <b style={{ color: "var(--nv)" }}>{a.user}</b>
+          </div>
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>Waktu</span>
+            <b style={{ color: "var(--nv)" }}>{a.time}</b>
+          </div>
+          {a.decidedAt && (
+            <div className="flex justify-between py-1.5">
+              <span style={{ color: "var(--mu)" }}>Diputuskan</span>
+              <b style={{ color: "var(--nv)" }}>
+                {a.decidedAt}
+                {a.by ? ` oleh ${a.by}` : ""}
+              </b>
+            </div>
+          )}
+        </div>
+      </Drawer>
+    );
+  }
+
+  /* ---------------- Supplier baru ---------------- */
+  if (a.kind === "supplier") {
+    const req = a.supplierRequest;
+    const supplier = db.suppliers.find((s) => s.id === a.supplierId);
+    return (
+      <Drawer
+        open={Boolean(approvalId)}
+        onClose={onClose}
+        title="Detail supplier baru"
+        footer={<DecisionFooter approval={a} onClose={onClose} />}
+      >
+        <div className="sdtop">
+          <div>
+            <div className="text-xs" style={{ color: "var(--mu)" }}>
+              Supplier baru
+            </div>
+            <div
+              className="font-extrabold text-lg"
+              style={{ color: "var(--nv)" }}
+            >
+              {a.supplierName ?? req?.name ?? supplier?.name ?? "-"}
+            </div>
+          </div>
+          <Badge tone={a.status}>{a.status}</Badge>
+        </div>
+
+        <div className="sdc">
+          <div className="sdh">
+            <span className="sdi">
+              <Icon name="purch" />
+            </span>
+            <span>Data supplier</span>
+          </div>
+          <div className="text-[13px]">
+            <div className="flex justify-between py-1.5">
+              <span style={{ color: "var(--mu)" }}>No. HP</span>
+              <b style={{ color: "var(--nv)" }}>
+                {req?.phone ?? supplier?.phone ?? "-"}
+              </b>
+            </div>
+            <div className="flex justify-between gap-4 py-1.5">
+              <span style={{ color: "var(--mu)" }}>Alamat</span>
+              <b className="text-right" style={{ color: "var(--nv)" }}>
+                {req?.address ?? supplier?.address ?? "-"}
+              </b>
+            </div>
+          </div>
+        </div>
+
+        <div className="sim">
+          Disetujui: supplier menjadi Aktif dan bisa dipilih di nota pembelian.
+          Ditolak: supplier tidak dipakai.
+        </div>
+
+        <div className="text-[13px] px-1 mt-3">
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>Diajukan</span>
+            <b style={{ color: "var(--nv)" }}>{a.user}</b>
+          </div>
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>Waktu</span>
+            <b style={{ color: "var(--nv)" }}>{a.time}</b>
+          </div>
+          {a.decidedAt && (
+            <div className="flex justify-between py-1.5">
+              <span style={{ color: "var(--mu)" }}>Diputuskan</span>
+              <b style={{ color: "var(--nv)" }}>
+                {a.decidedAt}
+                {a.by ? ` oleh ${a.by}` : ""}
+              </b>
+            </div>
+          )}
+          {a.note && (
+            <div className="text-[11.5px] mt-1" style={{ color: "var(--er)" }}>
+              {a.note}
+            </div>
+          )}
+        </div>
+      </Drawer>
+    );
+  }
+
+  /* ---------------- Ubah supplier ---------------- */
+  if (a.kind === "supplierEdit") {
+    const supplier = db.suppliers.find((s) => s.id === a.supplierId);
+    const changes = a.supplierChanges ?? [];
+    const fields: { field: SupplierChange["field"]; label: string }[] = [
+      { field: "name", label: "Nama supplier" },
+      { field: "phone", label: "No. HP" },
+      { field: "address", label: "Alamat" },
+    ];
+    const valueOf = (field: SupplierChange["field"], after: boolean) => {
+      const change = changes.find((c) => c.field === field);
+      if (change) return after ? change.after : change.before;
+      if (!supplier) return "";
+      const value =
+        field === "name"
+          ? supplier.name
+          : field === "phone"
+            ? supplier.phone
+            : supplier.address;
+      return value ?? "";
+    };
+    return (
+      <Drawer
+        open={Boolean(approvalId)}
+        onClose={onClose}
+        title="Detail ubah supplier"
+        footer={<DecisionFooter approval={a} onClose={onClose} />}
+      >
+        <div className="sdtop">
+          <div>
+            <div className="text-xs" style={{ color: "var(--mu)" }}>
+              Pengajuan ubah · {supplier ? supplierStatus(supplier) : "-"}
+            </div>
+            <div
+              className="font-extrabold text-lg"
+              style={{ color: "var(--nv)" }}
+            >
+              {a.supplierName ?? supplier?.name ?? "-"}
+            </div>
+          </div>
+          <Badge tone={a.status}>{a.status}</Badge>
+        </div>
+
+        <div className="sdc">
+          <div className="sdh">
+            <span className="sdi">
+              <Icon name="purch" />
+            </span>
+            <span>Sebelum &amp; sesudah</span>
+          </div>
+          {fields.map(({ field, label }) => {
+            const before = valueOf(field, false) || "—";
+            const after = valueOf(field, true) || "—";
+            const changed = before !== after;
+            return (
+              <div
+                key={field}
+                className="py-2 border-b"
+                style={{ borderColor: "var(--ln)" }}
+              >
+                <div className="text-[11.5px]" style={{ color: "var(--mu)" }}>
+                  {label}
+                </div>
+                {changed ? (
+                  <div className="text-[13.5px]">
+                    <s style={{ color: "var(--mu)" }}>{before}</s>
+                    <span style={{ color: "var(--mu)" }}> → </span>
+                    <b style={{ color: "var(--nv)" }}>{after}</b>
+                  </div>
+                ) : (
+                  <div className="text-[13.5px]" style={{ color: "var(--mu)" }}>
+                    {before} <span>(tidak berubah)</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="sim">
+          Disetujui: perubahan diterapkan ke data supplier, termasuk nama
+          supplier di nota pembelian lama. Ditolak: data supplier tetap seperti
+          semula.
+        </div>
+
+        <div className="text-[13px] px-1 mt-3">
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>Diajukan</span>
+            <b style={{ color: "var(--nv)" }}>{a.user}</b>
+          </div>
+          <div className="flex justify-between py-1.5">
+            <span style={{ color: "var(--mu)" }}>Waktu</span>
+            <b style={{ color: "var(--nv)" }}>{a.time}</b>
+          </div>
+          {a.decidedAt && (
+            <div className="flex justify-between py-1.5">
+              <span style={{ color: "var(--mu)" }}>Diputuskan</span>
+              <b style={{ color: "var(--nv)" }}>
+                {a.decidedAt}
+                {a.by ? ` oleh ${a.by}` : ""}
+              </b>
+            </div>
+          )}
+        </div>
+      </Drawer>
+    );
+  }
+
+  /* ---------------- Hapus supplier ---------------- */
+  if (a.kind === "supplierDelete") {
+    const supplier = db.suppliers.find((s) => s.id === a.supplierId);
+    const hasPurchases = supplier
+      ? db.purchases.some(
+          (p) =>
+            p.supplier.trim().toLowerCase() ===
+            supplier.name.trim().toLowerCase(),
+        )
+      : false;
+    return (
+      <Drawer
+        open={Boolean(approvalId)}
+        onClose={onClose}
+        title="Detail hapus supplier"
+        footer={<DecisionFooter approval={a} onClose={onClose} />}
+      >
+        <div className="sdtop">
+          <div>
+            <div className="text-xs" style={{ color: "var(--mu)" }}>
+              Pengajuan hapus · {supplier ? supplierStatus(supplier) : "-"}
+            </div>
+            <div
+              className="font-extrabold text-lg"
+              style={{ color: "var(--nv)" }}
+            >
+              {a.supplierName ?? supplier?.name ?? "-"}
+            </div>
+          </div>
+          <Badge tone={a.status}>{a.status}</Badge>
+        </div>
+
+        <div className="sdc">
+          <div className="sdh">
+            <span className="sdi">
+              <Icon name="purch" />
+            </span>
+            <span>Alasan pengajuan</span>
+          </div>
+          <div className="text-[13px]" style={{ color: "var(--tx)" }}>
+            {a.reason || "-"}
+          </div>
+        </div>
+
+        <div className="sim">
+          Disetujui:{" "}
+          {hasPurchases
+            ? "supplier diarsipkan karena sudah dipakai di nota pembelian."
+            : "supplier dihapus permanen karena belum pernah dipakai di pembelian."}{" "}
+          Ditolak: data supplier tetap seperti semula.
         </div>
 
         <div className="text-[13px] px-1 mt-3">

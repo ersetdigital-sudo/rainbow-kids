@@ -33,13 +33,13 @@ function authError(message: string): string {
 
 /**
  * Role akun yang sedang masuk. Dibaca dari `app_metadata` (hanya service role
- * yang bisa menulis); `user_metadata` cuma fallback untuk akun lama.
+ * yang bisa menulis); `user_metadata` tidak lagi dipakai sebagai fallback.
  */
 export function roleOfSession(
   user: Session["user"] | null | undefined,
 ): Role | null {
   if (!user) return null;
-  return roleFromMetadata(user.app_metadata, user.user_metadata);
+  return roleFromMetadata(user.app_metadata);
 }
 
 type AuthValue = {

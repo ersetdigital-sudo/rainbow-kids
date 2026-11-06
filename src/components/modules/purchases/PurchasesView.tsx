@@ -9,10 +9,13 @@ import { Badge } from "@/components/ui/Badge";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { PageHead } from "@/components/ui/PageHead";
 import { PurchaseDetailDrawer, PurchaseFormDrawer } from "./PurchaseDrawers";
+import { SuppliersView } from "./SuppliersView";
 import type { Purchase } from "@/lib/types";
 
 export function PurchasesView() {
   const { db } = useStore();
+  const [tab, setTab] = useState<"purchases" | "suppliers">("purchases");
+  const [supplierNewOpen, setSupplierNewOpen] = useState(false);
   const [supplier, setSupplier] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -83,113 +86,153 @@ export function PurchasesView() {
     <>
       <PageHead
         title="Pembelian Supplier"
-        subtitle="Catat pembelian sesuai nota/struk. Nota diajukan ke Owner — stok dan harga modal baru bertambah setelah disetujui."
+        subtitle={
+          tab === "purchases"
+            ? "Catat pembelian sesuai nota/struk. Nota diajukan ke Owner — stok dan harga modal baru bertambah setelah disetujui."
+            : "Daftar supplier untuk nota pembelian. Admin & User mengajukan tambah, ubah, dan hapus; Owner/Approver langsung tersimpan."
+        }
         actions={
-          <button type="button" className="btn p" onClick={() => setFormOpen(true)}>
-            + Catat pembelian
-          </button>
+          tab === "purchases" ? (
+            <button type="button" className="btn p" onClick={() => setFormOpen(true)}>
+              + Catat pembelian
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn p"
+              onClick={() => setSupplierNewOpen(true)}
+            >
+              + Supplier baru
+            </button>
+          )
         }
       />
 
-      <div className="card p-4 flex flex-wrap gap-2 items-end mb-4">
-        <div>
-          <label className="f">Supplier</label>
-          <select
-            value={supplier}
-            onChange={(e) => setSupplier(e.target.value)}
-          >
-            <option value="">Semua supplier</option>
-            {sups.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="f">Dari</label>
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-        </div>
-        <div>
-          <label className="f">Sampai</label>
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-        </div>
-        <div>
-          <label className="f">Status bayar</label>
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-          >
-            <option value="">Semua status</option>
-            <option value="Belum Lunas">Belum Lunas</option>
-            <option value="Menunggu Lunas">Menunggu Lunas</option>
-            <option value="Lunas">Lunas</option>
-          </select>
-        </div>
+      <div className="tabs mb-4">
         <button
           type="button"
-          className="btn"
-          onClick={() => {
-            setSupplier("");
-            setFrom("");
-            setTo("");
-            setStatus("");
-          }}
+          className={tab === "purchases" ? "on" : undefined}
+          onClick={() => setTab("purchases")}
         >
-          Reset
+          Daftar Pembelian
+        </button>
+        <button
+          type="button"
+          className={tab === "suppliers" ? "on" : undefined}
+          onClick={() => setTab("suppliers")}
+        >
+          Data Supplier
         </button>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4">
-        <div className="card lg:col-span-2">
-          <div className="px-5 pt-5 pb-3 font-bold">Daftar pembelian</div>
-          <DataTable
-            columns={columns}
-            rows={list}
-            rowKey={(p) => p.id}
-            onRowClick={(p) => setDetailId(p.id)}
-          />
-        </div>
-        <div className="card p-5">
-          <div className="font-bold mb-3">Rekap per supplier</div>
-          {rekap.map((r) => (
-            <div
-              key={r.s}
-              className="flex justify-between py-2.5 border-b text-[13px]"
-              style={{ borderColor: "#EEF1F6" }}
-            >
-              <div>
-                <div className="font-semibold">{r.s}</div>
-                <div className="text-xs" style={{ color: "var(--mu)" }}>
-                  {r.n} nota
-                </div>
-              </div>
-              <div className="num font-semibold">{rp(r.t)}</div>
+      {tab === "purchases" ? (
+        <>
+          <div className="card p-4 flex flex-wrap gap-2 items-end mb-4">
+            <div>
+              <label className="f">Supplier</label>
+              <select
+                value={supplier}
+                onChange={(e) => setSupplier(e.target.value)}
+              >
+                <option value="">Semua supplier</option>
+                {sups.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
             </div>
-          ))}
-          <div className="flex justify-between pt-3 font-bold">
-            <span>Total periode</span>
-            <span className="num">{rp(rekap.reduce((a, r) => a + r.t, 0))}</span>
+            <div>
+              <label className="f">Dari</label>
+              <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+            </div>
+            <div>
+              <label className="f">Sampai</label>
+              <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+            </div>
+            <div>
+              <label className="f">Status bayar</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+              >
+                <option value="">Semua status</option>
+                <option value="Belum Lunas">Belum Lunas</option>
+                <option value="Menunggu Lunas">Menunggu Lunas</option>
+                <option value="Lunas">Lunas</option>
+              </select>
+            </div>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                setSupplier("");
+                setFrom("");
+                setTo("");
+                setStatus("");
+              }}
+            >
+              Reset
+            </button>
           </div>
-          <div
-            className="mt-4 p-3 rounded-lg text-xs"
-            style={{ background: "var(--inb)", color: "var(--in)" }}
-          >
-            <b>Disiapkan untuk:</b> utang supplier (tempo, jatuh tempo, cicilan).
-            Kolom status pembayaran sudah tersedia di setiap nota.
-          </div>
-        </div>
-      </div>
 
-      <PurchaseFormDrawer
-        key={`purchase-form-${formOpen ? "open" : "closed"}`}
-        open={formOpen}
-        onClose={() => setFormOpen(false)}
-      />
-      <PurchaseDetailDrawer
-        purchaseId={detailId}
-        onClose={() => setDetailId(null)}
-      />
+          <div className="grid lg:grid-cols-3 gap-4">
+            <div className="card lg:col-span-2">
+              <div className="px-5 pt-5 pb-3 font-bold">Daftar pembelian</div>
+              <DataTable
+                columns={columns}
+                rows={list}
+                rowKey={(p) => p.id}
+                onRowClick={(p) => setDetailId(p.id)}
+              />
+            </div>
+            <div className="card p-5">
+              <div className="font-bold mb-3">Rekap per supplier</div>
+              {rekap.map((r) => (
+                <div
+                  key={r.s}
+                  className="flex justify-between py-2.5 border-b text-[13px]"
+                  style={{ borderColor: "#EEF1F6" }}
+                >
+                  <div>
+                    <div className="font-semibold">{r.s}</div>
+                    <div className="text-xs" style={{ color: "var(--mu)" }}>
+                      {r.n} nota
+                    </div>
+                  </div>
+                  <div className="num font-semibold">{rp(r.t)}</div>
+                </div>
+              ))}
+              <div className="flex justify-between pt-3 font-bold">
+                <span>Total periode</span>
+                <span className="num">{rp(rekap.reduce((a, r) => a + r.t, 0))}</span>
+              </div>
+              <div
+                className="mt-4 p-3 rounded-lg text-xs"
+                style={{ background: "var(--inb)", color: "var(--in)" }}
+              >
+                <b>Disiapkan untuk:</b> utang supplier (tempo, jatuh tempo, cicilan).
+                Kolom status pembayaran sudah tersedia di setiap nota.
+              </div>
+            </div>
+          </div>
+
+          <PurchaseFormDrawer
+            key={`purchase-form-${formOpen ? "open" : "closed"}`}
+            open={formOpen}
+            onClose={() => setFormOpen(false)}
+          />
+          <PurchaseDetailDrawer
+            purchaseId={detailId}
+            onClose={() => setDetailId(null)}
+          />
+        </>
+      ) : (
+        <SuppliersView
+          newOpen={supplierNewOpen}
+          onNewClose={() => setSupplierNewOpen(false)}
+        />
+      )}
     </>
   );
 }
