@@ -185,7 +185,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           (account?.name || meta.name || "").trim() ||
           email.split("@")[0] ||
           email;
-        // Role dari app_metadata (fallback user_metadata untuk akun lama).
+        // Role dari app_metadata; akun tanpa role dianggap User.
         const role = (account?.role ??
           roleOfSession(session.user) ??
           "User") as Role;
