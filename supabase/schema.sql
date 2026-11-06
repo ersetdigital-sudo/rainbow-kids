@@ -303,8 +303,37 @@ create index if not exists opname_lines_vid_idx on public.opname_lines (vid);
 -- ---------------------------------------------------------------------------
 -- 9. Hak akses tabel
 -- Satu toko dipakai bersama, jadi setiap pengguna yang sudah login
--- (role "authenticated") boleh baca & tulis. Tamu (anon) tidak dapat apa pun.
+-- (role "authenticated") boleh baca & tulis data operasional. Tamu (anon)
+-- tidak dapat apa pun.
+--
+-- Pengecualian (lihat juga supabase/migration-003-security.sql):
+-- * role_permissions & store_settings hanya boleh ditulis Owner.
+-- * approvals boleh dibuat semua pengguna, keputusannya hanya Approver/Owner.
 -- ---------------------------------------------------------------------------
+
+-- Role dibaca dari app_metadata (hanya service role yang bisa menulis).
+create or replace function public.current_app_role()
+returns text
+language sql
+stable
+set search_path = ''
+as $$
+  select coalesce(
+    nullif(auth.jwt() -> 'app_metadata' ->> 'role', ''),
+    nullif(auth.jwt() -> 'user_metadata' ->> 'role', '')
+  );
+$$;
+
+revoke all on function public.current_app_role() from public;
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    execute 'revoke all on function public.current_app_role() from anon';
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    execute 'grant execute on function public.current_app_role() to authenticated';
+  end if;
+end $$;
 
 do $$
 declare
@@ -312,10 +341,10 @@ declare
 begin
   for t in
     select unnest(array[
-      'store_settings', 'role_permissions', 'products', 'product_variants',
+      'products', 'product_variants',
       'customers', 'suppliers', 'sales', 'sale_items', 'sale_payments',
       'purchases', 'purchase_items', 'opnames', 'opname_lines',
-      'approvals', 'stock_history', 'expenses'
+      'stock_history', 'expenses'
     ])
   loop
     execute format('alter table public.%I enable row level security', t);
@@ -324,6 +353,75 @@ begin
       'create policy "toko akses penuh" on public.%I for all to authenticated using (true) with check (true)',
       t
     );
+  end loop;
+end $$;
+
+-- Pengaturan toko & matriks hak akses: baca semua pengguna, tulis hanya Owner.
+do $$
+declare
+  t text;
+begin
+  for t in select unnest(array['store_settings', 'role_permissions'])
+  loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists "toko akses penuh" on public.%I', t);
+    execute format('drop policy if exists "pengaturan dibaca semua" on public.%I', t);
+    execute format('drop policy if exists "pengaturan ditulis owner" on public.%I', t);
+    execute format(
+      'create policy "pengaturan dibaca semua" on public.%I for select to authenticated using (true)',
+      t
+    );
+    execute format(
+      'create policy "pengaturan ditulis owner" on public.%I for all to authenticated using (public.current_app_role() = ''Owner'') with check (public.current_app_role() = ''Owner'')',
+      t
+    );
+  end loop;
+end $$;
+
+-- Approval & audit: ajukan boleh semua, putuskan hanya Approver/Owner.
+alter table public.approvals enable row level security;
+
+drop policy if exists "toko akses penuh" on public.approvals;
+drop policy if exists "approval dibaca semua" on public.approvals;
+drop policy if exists "approval diajukan semua" on public.approvals;
+drop policy if exists "approval diputuskan penyetuju" on public.approvals;
+drop policy if exists "approval dihapus owner" on public.approvals;
+
+create policy "approval dibaca semua" on public.approvals
+  for select to authenticated
+  using (true);
+
+create policy "approval diajukan semua" on public.approvals
+  for insert to authenticated
+  with check (true);
+
+create policy "approval diputuskan penyetuju" on public.approvals
+  for update to authenticated
+  using (public.current_app_role() in ('Owner', 'Approver'))
+  with check (public.current_app_role() in ('Owner', 'Approver'));
+
+create policy "approval dihapus owner" on public.approvals
+  for delete to authenticated
+  using (public.current_app_role() = 'Owner');
+
+-- Helper internal Supabase tidak perlu bisa dipanggil klien.
+do $$
+declare
+  fn regprocedure;
+begin
+  for fn in
+    select p.oid::regprocedure
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'rls_auto_enable'
+  loop
+    execute format('revoke all on function %s from public', fn);
+    if exists (select 1 from pg_roles where rolname = 'anon') then
+      execute format('revoke all on function %s from anon', fn);
+    end if;
+    if exists (select 1 from pg_roles where rolname = 'authenticated') then
+      execute format('revoke all on function %s from authenticated', fn);
+    end if;
   end loop;
 end $$;
 

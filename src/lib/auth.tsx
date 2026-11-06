@@ -10,6 +10,8 @@ import {
 } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { getSupabase, isSupabaseConfigured } from "./supabase";
+import { roleFromMetadata } from "./roles";
+import type { Role } from "./types";
 
 type Result = { ok: boolean; msg: string };
 
@@ -27,6 +29,17 @@ const AUTH_ERRORS: Record<string, string> = {
 
 function authError(message: string): string {
   return AUTH_ERRORS[message] ?? message;
+}
+
+/**
+ * Role akun yang sedang masuk. Dibaca dari `app_metadata` (hanya service role
+ * yang bisa menulis); `user_metadata` cuma fallback untuk akun lama.
+ */
+export function roleOfSession(
+  user: Session["user"] | null | undefined,
+): Role | null {
+  if (!user) return null;
+  return roleFromMetadata(user.app_metadata, user.user_metadata);
 }
 
 type AuthValue = {

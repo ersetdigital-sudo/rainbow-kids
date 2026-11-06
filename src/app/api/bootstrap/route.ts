@@ -140,11 +140,14 @@ export async function POST(request: Request) {
     );
   }
 
+  // Role ditulis ke app_metadata: hanya service role yang bisa mengubahnya,
+  // berbeda dengan user_metadata yang bisa diubah pemilik akun sendiri.
   const { data: created, error } = await admin.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
-    user_metadata: { name, role: "Owner" },
+    user_metadata: { name },
+    app_metadata: { role: "Owner" },
   });
   if (error) {
     return Response.json({ ok: false, msg: error.message }, { status: 400 });

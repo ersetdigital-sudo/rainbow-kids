@@ -16,6 +16,11 @@ form yang jadi bottom sheet di layar kecil.
    Kalau database-nya sudah dibuat sebelum ada pengaturan tambahan (logo invoice, jatuh tempo
    bawaan, ambang stok menipis, metode pembayaran), jalankan sekali juga
    `supabase/migration-002-settings.sql` — hanya menambah 5 kolom di `store_settings`.
+   Setelah itu jalankan `supabase/migration-003-security.sql`: menyalin role akun lama dari
+   `user_metadata` ke `app_metadata`, memperketat RLS (`role_permissions`/`store_settings`
+   hanya Owner, keputusan approval hanya Approver/Owner), dan mencabut `EXECUTE`
+   `public.rls_auto_enable()` dari `anon`/`authenticated`. Aman dijalankan ulang.
+   **Urutan yang benar: schema.sql → migration-002 → migration-003.**
    Skrip ini membuat tabel relasional: `products` + `product_variants`, `customers`,
    `suppliers`, `sales` + `sale_items` + `sale_payments`, `purchases` + `purchase_items`,
    `opnames` + `opname_lines`, `approvals`, `stock_history`, `expenses`,
@@ -31,6 +36,15 @@ form yang jadi bottom sheet di layar kecil.
    - `SUPABASE_SERVICE_ROLE_KEY` — *Project Settings → API → service_role* (hanya dipakai server untuk membuat akun)
 3. Buka aplikasi: layar masuk muncul. Karena belum ada akun, isi **Buat akun Owner** (nama, email, password).
 4. Pengguna lain ditambahkan dari menu **Pengguna &amp; Akses → Tambah pengguna** (lengkap dengan password).
+   Menu ini hanya bisa dipakai **Owner** (dicek di `/api/users` dari `app_metadata.role`).
+
+> 🔒 **Wajib:** matikan **Authentication → Sign In / Providers → Allow new users to sign up**
+> di Supabase. Akun hanya boleh dibuat lewat aplikasi (service role); tanpa ini siapa pun
+> yang punya anon key bisa mendaftar sendiri.
+>
+> Role akun disimpan di `app_metadata.role` (bukan `user_metadata`, yang bisa diubah pemilik
+> akun). Akun lama disalin otomatis oleh `supabase/migration-003-security.sql` dan oleh
+> `/api/users` saat daftar pengguna dibaca.
 
 ## Menjalankan
 
@@ -95,7 +109,7 @@ Daftar pengguna dan role-nya adalah akun Supabase Auth yang sebenarnya
 | --- | --- | --- |
 | Identitas toko (nama, alamat, HP, email, NPWP, rekening) | Pengaturan Toko | `store_settings` |
 | Hak akses per role | Pengguna & Akses | `role_permissions` |
-| Pengguna, role, status aktif | Pengguna & Hak Akses | Supabase Auth (`user_metadata.role`, ban = nonaktif) |
+| Pengguna, role, status aktif | Pengguna & Hak Akses | Supabase Auth (`app_metadata.role`, ban = nonaktif) |
 | Produk & stok varian | Produk & Stok | `products`, `product_variants` |
 | Pelanggan / supplier | menu masing-masing | `customers`, `suppliers` |
 | Penjualan / piutang | Penjualan | `sales`, `sale_items`, `sale_payments` |

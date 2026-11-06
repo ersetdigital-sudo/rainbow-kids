@@ -15,6 +15,7 @@ import {
   variantLabel,
 } from "@/lib/calc";
 import { useStore } from "@/lib/store";
+import { useApproverAccess } from "@/lib/perms";
 import { Badge } from "@/components/ui/Badge";
 import { Drawer } from "@/components/ui/Drawer";
 import { Icon } from "@/components/ui/Icon";
@@ -29,9 +30,10 @@ function DecisionFooter({
   onClose: () => void;
 }) {
   const { decideApproval, toast } = useStore();
+  const { allowed: canApprove } = useApproverAccess();
   return (
     <>
-      {approval.status === "Menunggu" && (
+      {canApprove && approval.status === "Menunggu" && (
         <>
           <button
             type="button"

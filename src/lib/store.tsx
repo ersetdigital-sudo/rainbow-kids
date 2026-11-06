@@ -9,7 +9,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { useAuth } from "./auth";
+import { roleOfSession, useAuth } from "./auth";
 import { TODAY, nowStamp } from "./date";
 import { fetchRemoteState, setRemoteErrorHandler } from "./remote";
 import { uid } from "./format";
@@ -110,8 +110,6 @@ export type Result = {
 
 const PERM_LEVELS = ["Tidak", "Lihat", "Input", "Ajukan", "Penuh", "Setujui"];
 
-const ROLES = ["Owner", "Admin", "Approver", "User"];
-
 /**
  * Apakah `db.user` (mis. "Budi (Owner)") merujuk ke pengguna ini.
  * Data lama menyimpan nama depan saja, jadi nama depan juga dicocokkan.
@@ -167,10 +165,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         if (cancelled || !res.ok) return;
 
         const email = (session.user.email ?? "").trim();
-        const meta = (session.user.user_metadata ?? {}) as {
-          name?: string;
-          role?: string;
-        };
+        const meta = (session.user.user_metadata ?? {}) as { name?: string };
         const account = accounts?.find(
           (a) => a.email.toLowerCase() === email.toLowerCase(),
         );
@@ -178,8 +173,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           (account?.name || meta.name || "").trim() ||
           email.split("@")[0] ||
           email;
+        // Role dari app_metadata (fallback user_metadata untuk akun lama).
         const role = (account?.role ??
-          (ROLES.includes(meta.role ?? "") ? meta.role : "User")) as Role;
+          roleOfSession(session.user) ??
+          "User") as Role;
 
         setSnapshot(() => {
           // Baris kosong = toko baru: mulai dari ruang kerja kosong.

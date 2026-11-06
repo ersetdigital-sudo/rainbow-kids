@@ -9,6 +9,7 @@ import { findVariant, opnameDiff, purchaseTotal, variantLabel } from "@/lib/calc
 import { formatDate } from "@/lib/date";
 import { rp } from "@/lib/format";
 import { useStore } from "@/lib/store";
+import { useApproverAccess } from "@/lib/perms";
 import type { IconName } from "@/lib/nav";
 import { Icon } from "@/components/ui/Icon";
 import { Badge } from "@/components/ui/Badge";
@@ -251,6 +252,7 @@ function useIsClient() {
 /** Lonceng Topbar: riwayat kegiatan approval & stok opname terbaru. */
 export function ActivityBell() {
   const { db } = useStore();
+  const { allowed: canApprove } = useApproverAccess();
   const router = useRouter();
   const isMobile = useIsMobile();
   const isClient = useIsClient();
@@ -335,6 +337,8 @@ export function ActivityBell() {
       setApprovalId(item.id);
       return;
     }
+    // Halaman daftar approval hanya untuk pemegang hak "Setujui".
+    if (!canApprove) return;
     router.push(`/approvals?focus=${encodeURIComponent(item.id)}`);
   };
 
@@ -498,16 +502,18 @@ export function ActivityBell() {
                       )}
                     </div>
 
-                    <div className="act-foot">
-                      <Link
-                        href="/approvals"
-                        className="act-more"
-                        onClick={() => setOpen(false)}
-                      >
-                        Lihat semua
-                        <span aria-hidden="true">→</span>
-                      </Link>
-                    </div>
+                    {canApprove && (
+                      <div className="act-foot">
+                        <Link
+                          href="/approvals"
+                          className="act-more"
+                          onClick={() => setOpen(false)}
+                        >
+                          Lihat semua
+                          <span aria-hidden="true">→</span>
+                        </Link>
+                      </div>
+                    )}
                   </motion.div>
                 </motion.div>
               )}

@@ -7,6 +7,7 @@ import { addDays, formatDate, TODAY } from "@/lib/date";
 import { rp } from "@/lib/format";
 import { allV, arStatus, salePaid, saleProfit, saleTotal } from "@/lib/calc";
 import { useStore } from "@/lib/store";
+import { useApproverAccess } from "@/lib/perms";
 import { Badge } from "@/components/ui/Badge";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { Gauge } from "@/components/dashboard/Gauge";
@@ -24,6 +25,7 @@ const fadeUp = (delay: number) => ({
 
 export function DashboardView() {
   const { db } = useStore();
+  const { allowed: canApprove } = useApproverAccess();
   const [saleOpen, setSaleOpen] = useState(false);
   const [purchaseOpen, setPurchaseOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -547,7 +549,7 @@ export function DashboardView() {
                 Semua stok aman.
               </div>
             )}
-            {pending > 0 && (
+            {pending > 0 && canApprove && (
               <Link
                 href="/approvals"
                 className="block mt-4 p-3 rounded-lg text-[13px] font-semibold"

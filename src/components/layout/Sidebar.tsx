@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { NAV } from "@/lib/nav";
+import { NAV, navVisible } from "@/lib/nav";
 import { useStore } from "@/lib/store";
+import { useApproverAccess } from "@/lib/perms";
 import { Icon } from "@/components/ui/Icon";
 
 export function Sidebar({
@@ -19,7 +20,10 @@ export function Sidebar({
   const pathname = usePathname();
   const { db } = useStore();
   const { configured } = useAuth();
-  const pending = db.approvals.filter((a) => a.status === "Menunggu").length;
+  const { allowed: canApprove } = useApproverAccess();
+  const pending = canApprove
+    ? db.approvals.filter((a) => a.status === "Menunggu").length
+    : 0;
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -60,22 +64,24 @@ export function Sidebar({
             </div>
           ) : (
             <div key={`g-${gi}`}>
-              {group.items.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={onClose}
-                  title={item.label}
-                  className={isActive(item.href) ? "on" : undefined}
-                  aria-current={isActive(item.href) ? "page" : undefined}
-                >
-                  <Icon name={item.icon} />
-                  <span className="navl flex-1">{item.label}</span>
-                  {item.href === "/approvals" && pending > 0 && (
-                    <span className="npill">{pending}</span>
-                  )}
-                </Link>
-              ))}
+              {group.items
+                .filter((item) => navVisible(item.href, canApprove))
+                .map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={onClose}
+                    title={item.label}
+                    className={isActive(item.href) ? "on" : undefined}
+                    aria-current={isActive(item.href) ? "page" : undefined}
+                  >
+                    <Icon name={item.icon} />
+                    <span className="navl flex-1">{item.label}</span>
+                    {item.href === "/approvals" && pending > 0 && (
+                      <span className="npill">{pending}</span>
+                    )}
+                  </Link>
+                ))}
             </div>
           ),
         )}

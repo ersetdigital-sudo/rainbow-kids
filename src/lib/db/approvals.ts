@@ -9,7 +9,14 @@ import type {
   SaleRequest,
   SaleRevision,
 } from "../types";
-import { deleteRows, diffRows, selectAll, upsertRows, type Row } from "./client";
+import {
+  deleteRows,
+  diffRows,
+  insertRowsIfNew,
+  selectAll,
+  upsertRows,
+  type Row,
+} from "./client";
 
 /** Rincian usulan yang disimpan sebagai satu kolom jsonb. */
 type ApprovalDetail = {
@@ -121,6 +128,15 @@ export async function saveApprovals(
   const rows = (list: Approval[]) => list.map(toRow);
   const { changed, removed } = diffRows(rows(prev), rows(next), (r) => r.id);
   await deleteRows("approvals", "id", removed);
-  await upsertRows("approvals", changed as unknown as Row[]);
+
+  // RLS membedakan "membuat pengajuan" (semua role) dari "mengubah keputusan"
+  // (hanya Approver/Owner), jadi baris baru memakai insert — bukan upsert yang
+  // menuntut hak update.
+  const before = new Set(prev.map((a) => a.id));
+  const added = changed.filter((r) => !before.has(r.id));
+  const updated = changed.filter((r) => before.has(r.id));
+  if (added.length)
+    await insertRowsIfNew("approvals", added as unknown as Row[]);
+  if (updated.length) await upsertRows("approvals", updated as unknown as Row[]);
 }
 

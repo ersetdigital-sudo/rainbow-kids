@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { ApprovalsView } from "@/components/modules/approvals/ApprovalsView";
+import { ApproverGuard } from "@/components/modules/approvals/ApproverGuard";
 
 export const metadata: Metadata = {
   title: "Approval & Audit Log",
@@ -26,7 +27,9 @@ export default function ApprovalsPage({
 }) {
   return (
     <Suspense fallback={<div className="min-h-40" aria-hidden="true" />}>
-      <ApprovalsContent searchParams={searchParams} />
+      <ApproverGuard>
+        <ApprovalsContent searchParams={searchParams} />
+      </ApproverGuard>
     </Suspense>
   );
 }

@@ -28,6 +28,24 @@ export async function insertRows(name: string, rows: Row[]): Promise<void> {
   if (error) throw new Error(`${name}: ${error.message}`);
 }
 
+/**
+ * Tambah baris baru dan abaikan baris yang sudah ada (`on conflict do nothing`).
+ * Aman diulang setelah penyimpanan gagal di tengah jalan, dan hanya butuh hak
+ * insert — tidak butuh hak update seperti `upsertRows`.
+ */
+export async function insertRowsIfNew(
+  name: string,
+  rows: Row[],
+  onConflict = "id",
+): Promise<void> {
+  if (!rows.length) return;
+  const { error } = await table(name).upsert(rows, {
+    onConflict,
+    ignoreDuplicates: true,
+  });
+  if (error) throw new Error(`${name}: ${error.message}`);
+}
+
 /** Simpan baris baru / yang berubah. */
 export async function upsertRows(name: string, rows: Row[]): Promise<void> {
   if (!rows.length) return;

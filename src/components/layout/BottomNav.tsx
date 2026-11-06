@@ -2,17 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BOTTOM_NAV } from "@/lib/nav";
+import { BOTTOM_NAV, navVisible } from "@/lib/nav";
+import { useApproverAccess } from "@/lib/perms";
 import { Icon } from "@/components/ui/Icon";
 
 export function BottomNav({ onMenu }: { onMenu: () => void }) {
   const pathname = usePathname();
+  const { allowed: canApprove } = useApproverAccess();
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
 
   return (
     <nav id="bnav">
-      {BOTTOM_NAV.map((item) => (
+      {BOTTOM_NAV.filter((item) => navVisible(item.href, canApprove)).map((item) => (
         <Link
           key={item.href}
           href={item.href}

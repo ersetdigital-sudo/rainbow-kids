@@ -32,6 +32,13 @@ export const ICONS: Record<IconName, string> = {
 export type NavItem = { href: string; label: string; icon: IconName };
 export type NavGroup = { heading: string } | { items: NavItem[] };
 
+/** Halaman Approval & Audit hanya untuk pemegang hak "Setujui". */
+export const APPROVAL_ROUTE = "/approvals";
+
+export function navVisible(href: string, allowed: boolean): boolean {
+  return href !== APPROVAL_ROUTE || allowed;
+}
+
 export const NAV: NavGroup[] = [
   { heading: "Utama" },
   {
