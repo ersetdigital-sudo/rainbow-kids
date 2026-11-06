@@ -35,6 +35,9 @@ const KIND_META: Record<
   customer: { label: "Toko Baru", icon: "cust" },
   customerEdit: { label: "Ubah Toko", icon: "cust" },
   customerDelete: { label: "Hapus Toko", icon: "cust" },
+  supplier: { label: "Supplier Baru", icon: "purch" },
+  supplierEdit: { label: "Ubah Supplier", icon: "purch" },
+  supplierDelete: { label: "Hapus Supplier", icon: "purch" },
   saleDelete: { label: "Hapus Penjualan", icon: "sales" },
 };
 
@@ -48,6 +51,9 @@ const DETAIL_KINDS = new Set<Approval["kind"]>([
   "customer",
   "customerEdit",
   "customerDelete",
+  "supplier",
+  "supplierEdit",
+  "supplierDelete",
   "saleDelete",
 ]);
 
@@ -174,6 +180,40 @@ function approvalActivity(db: DB, a: Approval): ActivityItem {
         ...base,
         summary: `${a.customerName ?? customer?.name ?? "-"}`,
         detail: a.reason ? `Alasan: ${a.reason}` : "Pengajuan hapus toko",
+      };
+    }
+    case "supplier": {
+      const supplier = db.suppliers.find((s) => s.id === a.supplierId);
+      return {
+        ...base,
+        summary: a.supplierRequest?.name ?? a.supplierName ?? supplier?.name ?? "-",
+        detail:
+          a.status === "Menunggu"
+            ? "Supplier baru menunggu approval"
+            : a.status === "Disetujui"
+              ? "Supplier disetujui — status Aktif"
+              : "Supplier ditolak — diarsipkan",
+      };
+    }
+    case "supplierEdit": {
+      const supplier = db.suppliers.find((s) => s.id === a.supplierId);
+      const fields = (a.supplierChanges ?? []).map((c) =>
+        c.field === "name" ? "nama" : c.field === "phone" ? "HP" : "alamat",
+      );
+      return {
+        ...base,
+        summary: a.supplierName ?? supplier?.name ?? "-",
+        detail: fields.length
+          ? `Perubahan ${fields.join(", ")}`
+          : "Pengajuan ubah data supplier",
+      };
+    }
+    case "supplierDelete": {
+      const supplier = db.suppliers.find((s) => s.id === a.supplierId);
+      return {
+        ...base,
+        summary: `${a.supplierName ?? supplier?.name ?? "-"}`,
+        detail: a.reason ? `Alasan: ${a.reason}` : "Pengajuan hapus supplier",
       };
     }
     case "saleDelete": {
