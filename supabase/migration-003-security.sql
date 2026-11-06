@@ -21,15 +21,16 @@
 --    user_metadata bisa diubah pemilik akun lewat anon key, app_metadata tidak.
 -- ---------------------------------------------------------------------------
 
+-- Kolom aslinya di auth.users: raw_app_meta_data / raw_user_meta_data.
 update auth.users
-set app_metadata = jsonb_set(
-      coalesce(app_metadata, '{}'::jsonb),
+set raw_app_meta_data = jsonb_set(
+      coalesce(raw_app_meta_data, '{}'::jsonb),
       '{role}',
-      to_jsonb(user_metadata ->> 'role'),
+      to_jsonb(raw_user_meta_data ->> 'role'),
       true
     )
-where coalesce(app_metadata ->> 'role', '') = ''
-  and coalesce(user_metadata ->> 'role', '') in ('Owner', 'Admin', 'Approver', 'User');
+where coalesce(raw_app_meta_data ->> 'role', '') = ''
+  and coalesce(raw_user_meta_data ->> 'role', '') in ('Owner', 'Admin', 'Approver', 'User');
 
 -- ---------------------------------------------------------------------------
 -- 2. Helper role dari JWT
