@@ -23,6 +23,8 @@ import {
 } from "./users";
 import {
   customerStatus,
+  discountOf,
+  itemsSub,
   overdueSales,
   purchaseTotal,
   saleBelongsToCustomer,
@@ -75,6 +77,9 @@ export type SaleDraft = {
   ship: number;
   pack: number;
   other: number;
+  /** Diskon rupiah (pengurang total) dan keterangan bebasnya. */
+  discount: number;
+  discountNote: string;
   paid: number;
 };
 
@@ -859,6 +864,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       ship: draft.ship,
       pack: draft.pack,
       other: draft.other,
+      discount: discountOf(items, draft.discount),
+      discountNote: draft.discountNote.trim(),
       paid: draft.paid,
       overdue: overdueSummary,
     };
@@ -886,7 +893,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           kind: "invoice" as const,
           type: "Invoice penjualan baru",
           before: 0,
-          after: items.reduce((a, i) => a + i.qty * i.price, 0),
+          after: itemsSub(items) - (request.discount ?? 0),
           saleRequest: request,
           user: prev.user,
           time,
@@ -940,7 +947,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const sameOps =
         +sale.ship === +revision.ship &&
         +sale.pack === +revision.pack &&
-        +sale.other === +revision.other;
+        +sale.other === +revision.other &&
+        discountOf(sale.items, sale.discount) ===
+          discountOf(revision.items, revision.discount) &&
+        (sale.discountNote ?? "") === (revision.discountNote ?? "");
       if (sameItems && sameOps) return { ok: false, msg: "Tidak ada perubahan" };
 
       const time = nowStamp();
@@ -1869,6 +1879,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           ship: req.ship,
           pack: req.pack,
           other: req.other,
+          discount: req.discount ?? 0,
+          discountNote: req.discountNote ?? "",
           note: "",
           payments: [],
         };

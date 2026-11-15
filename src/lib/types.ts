@@ -107,6 +107,10 @@ export type Sale = {
   ship: number;
   pack: number;
   other: number;
+  /** Diskon (rupiah) sebagai pengurang total harga. Data lama tidak punya. */
+  discount?: number;
+  /** Keterangan diskon bebas, mis. "Diskon 5 persen" atau "Khusus produk X". */
+  discountNote?: string;
   note?: string;
   payments: Payment[];
 };
@@ -179,6 +183,8 @@ export type SaleRequest = {
   ship: number;
   pack: number;
   other: number;
+  discount?: number;
+  discountNote?: string;
   paid: number;
   overdue?: SaleOverdueSummary;
 };
@@ -189,6 +195,8 @@ export type SaleRevision = {
   ship: number;
   pack: number;
   other: number;
+  discount?: number;
+  discountNote?: string;
 };
 
 /** Usulan nota belanja supplier — baru tercatat setelah disetujui Owner. */

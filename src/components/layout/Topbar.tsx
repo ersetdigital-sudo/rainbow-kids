@@ -1,13 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 import { ActivityBell } from "./ActivityBell";
+import { ChangePasswordDrawer } from "./ChangePasswordDrawer";
 import { GlobalSearch } from "./GlobalSearch";
 
 export function Topbar({ onMenu }: { onMenu: () => void }) {
   const { db } = useStore();
   const { configured, signOut, session } = useAuth();
+  const [pwOpen, setPwOpen] = useState(false);
   const owner = db.users.find((u) => u.role === "Owner") ?? db.users[0];
   const active =
     db.users.find((u) => `${u.name} (${u.role})` === db.user.trim()) ?? owner;
@@ -26,6 +29,7 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
     .toUpperCase();
 
   return (
+    <>
     <header className="top">
       <button
         type="button"
@@ -64,6 +68,31 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
           <button
             type="button"
             className="tb-btn"
+            onClick={() => setPwOpen(true)}
+            aria-label="Ganti password"
+            title="Ganti password"
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="8" cy="15" r="4" />
+              <path d="m10.8 12.2 9.2-9.2M16 7l3 3M14 9l2 2" />
+            </svg>
+          </button>
+        )}
+
+        {configured && (
+          <button
+            type="button"
+            className="tb-btn"
             onClick={() => void signOut()}
             aria-label="Keluar"
             title="Keluar"
@@ -87,5 +116,11 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
         )}
       </div>
     </header>
+
+    {/* Di luar <header>: backdrop-filter-nya membuat elemen fixed ikut terpotong. */}
+    {configured && (
+      <ChangePasswordDrawer open={pwOpen} onClose={() => setPwOpen(false)} />
+    )}
+    </>
   );
 }

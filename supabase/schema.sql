@@ -104,6 +104,8 @@ create table if not exists public.sales (
   ship numeric not null default 0,
   pack numeric not null default 0,
   other numeric not null default 0,
+  discount numeric not null default 0,
+  discount_note text not null default '',
   note text,
   position integer not null default 0,
   created_at timestamptz not null default now()

@@ -9,6 +9,7 @@ import {
   arStatus,
   itemProfit,
   saleCost,
+  saleDiscount,
   saleOps,
   salePaid,
   saleProfit,
@@ -289,8 +290,19 @@ export function InvoiceView({ invoiceId }: { invoiceId?: string }) {
                 style={{ display: "flex", justifyContent: "space-between" }}
               >
                 <span>Subtotal</span>
-                <span>{rp(saleTotal(sale))}</span>
+                <span>{rp(saleSub(sale))}</span>
               </div>
+              {saleDiscount(sale) > 0 && (
+                <div
+                  style={{ display: "flex", justifyContent: "space-between" }}
+                >
+                  <span>
+                    Diskon
+                    {sale.discountNote ? ` (${sale.discountNote})` : ""}
+                  </span>
+                  <span>− {rp(saleDiscount(sale))}</span>
+                </div>
+              )}
               <div
                 style={{
                   display: "flex",
@@ -426,8 +438,10 @@ export function InvoiceView({ invoiceId }: { invoiceId?: string }) {
               Laba transaksi
             </div>
             <div className="flex justify-between text-[13px] py-1 border-b" style={{ borderColor: "#F0F1F6" }}>
-              <span style={{ color: "var(--mu)" }}>Total penjualan</span>
-              <span className="num">{rp(saleSub(sale))}</span>
+              <span style={{ color: "var(--mu)" }}>
+                Total penjualan{saleDiscount(sale) > 0 && " (setelah diskon)"}
+              </span>
+              <span className="num">{rp(saleTotal(sale))}</span>
             </div>
             <div className="flex justify-between text-[13px] py-1 border-b" style={{ borderColor: "#F0F1F6" }}>
               <span style={{ color: "var(--mu)" }}>− Modal barang</span>

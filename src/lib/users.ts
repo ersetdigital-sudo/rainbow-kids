@@ -62,6 +62,52 @@ export async function patchAccount(patch: AccountPatch): Promise<Result> {
   }
 }
 
+/** Owner menetapkan password baru untuk sebuah akun (reset / ganti). */
+export async function resetAccountPassword(
+  email: string,
+  password: string,
+): Promise<Result> {
+  if (!getSupabase()) return { ok: false, msg: "Supabase belum dikonfigurasi" };
+  try {
+    const res = await fetch("/api/users", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+      body: JSON.stringify({ email, password }),
+    });
+    const json = (await res.json().catch(() => null)) as
+      | { ok?: boolean; msg?: string }
+      | null;
+    return json?.ok
+      ? { ok: true, msg: "Password berhasil diganti" }
+      : { ok: false, msg: json?.msg || "Gagal mengganti password" };
+  } catch {
+    return { ok: false, msg: "Gagal menghubungi server" };
+  }
+}
+
+/** Pengguna yang sedang masuk mengganti password miliknya sendiri. */
+export async function changeOwnPassword(
+  current: string,
+  next: string,
+): Promise<Result> {
+  if (!getSupabase()) return { ok: false, msg: "Supabase belum dikonfigurasi" };
+  try {
+    const res = await fetch("/api/account/password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+      body: JSON.stringify({ current, next }),
+    });
+    const json = (await res.json().catch(() => null)) as
+      | { ok?: boolean; msg?: string }
+      | null;
+    return json?.ok
+      ? { ok: true, msg: "Password berhasil diganti" }
+      : { ok: false, msg: json?.msg || "Gagal mengganti password" };
+  } catch {
+    return { ok: false, msg: "Gagal menghubungi server" };
+  }
+}
+
 /** Hapus akun login dari Supabase Auth. */
 export async function removeAccount(email: string): Promise<Result> {
   if (!getSupabase()) return { ok: false, msg: "Supabase belum dikonfigurasi" };

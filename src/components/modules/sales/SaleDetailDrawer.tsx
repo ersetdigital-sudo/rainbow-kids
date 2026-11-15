@@ -10,6 +10,7 @@ import {
   itemProfit,
   overdueSales,
   saleCost,
+  saleDiscount,
   saleOps,
   salePaid,
   saleProfit,
@@ -414,8 +415,8 @@ export function SaleDetailDrawer({
 
             <div className="sd2-box sd2-t-ringkasan sd2-o-profit">
               <div className="sd2-line">
-                <span>Penjualan</span>
-                <span className="num">{rp(saleSub(sale))}</span>
+                <span>Penjualan{saleDiscount(sale) > 0 && " (setelah diskon)"}</span>
+                <span className="num">{rp(saleTotal(sale))}</span>
               </div>
               <div className="sd2-line">
                 <span>Modal barang</span>
@@ -541,6 +542,15 @@ export function SaleDetailDrawer({
                   <span>Jumlah barang</span>
                   <span className="num">{pcs} pcs</span>
                 </div>
+                {saleDiscount(sale) > 0 && (
+                  <div className="sd2-line">
+                    <span>
+                      Diskon
+                      {sale.discountNote ? ` (${sale.discountNote})` : ""}
+                    </span>
+                    <span className="num">− {rp(saleDiscount(sale))}</span>
+                  </div>
+                )}
                 <div className="sd2-line total">
                   <span>Total tagihan</span>
                   <span className="num">{rp(total)}</span>

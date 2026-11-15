@@ -181,10 +181,20 @@ export async function PATCH(request: Request) {
     newEmail?: string;
     role?: string;
     active?: boolean;
+    /** Reset password: Owner menetapkan password baru untuk akun ini. */
+    password?: string;
   } | null;
 
   const email = body?.email?.trim().toLowerCase() ?? "";
   if (!EMAIL_RE.test(email)) return invalidEmail();
+
+  const newPassword = typeof body?.password === "string" ? body.password : "";
+  if (typeof body?.password === "string" && newPassword.length < 6) {
+    return Response.json(
+      { ok: false, msg: "Password minimal 6 karakter" },
+      { status: 400 },
+    );
+  }
 
   const users = await listUsers(ctx.admin);
   const target = users.find((u) => (u.email ?? "").toLowerCase() === email);
@@ -240,9 +250,12 @@ export async function PATCH(request: Request) {
     email?: string;
     email_confirm?: boolean;
     ban_duration?: string;
+    password?: string;
     user_metadata: Record<string, unknown>;
     app_metadata: Record<string, unknown>;
   } = { user_metadata: meta, app_metadata: appMeta };
+
+  if (newPassword) attrs.password = newPassword;
 
   if (typeof body?.newEmail === "string") {
     const next = body.newEmail.trim().toLowerCase();

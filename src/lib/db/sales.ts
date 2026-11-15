@@ -11,6 +11,8 @@ type SaleRow = {
   ship: number;
   pack: number;
   other: number;
+  discount?: number;
+  discount_note?: string;
   note: string | null;
   position: number;
 };
@@ -45,9 +47,39 @@ function saleRows(sales: Sale[]): SaleRow[] {
     ship: s.ship,
     pack: s.pack,
     other: s.other,
+    discount: s.discount ?? 0,
+    discount_note: s.discountNote ?? "",
     note: s.note ?? null,
     position: index,
   }));
+}
+
+/** Supabase menolak kolom yang belum ada (migrasi belum dijalankan). */
+function missingColumn(error: unknown): boolean {
+  const msg = (error instanceof Error ? error.message : String(error)).toLowerCase();
+  return msg.includes("does not exist") || msg.includes("schema cache");
+}
+
+/**
+ * Tulis header invoice. Bila kolom diskon belum ada di database, simpan tanpa
+ * kolom itu supaya penyimpanan invoice lain tidak ikut gagal.
+ */
+async function writeHeaders(rows: SaleRow[]): Promise<void> {
+  try {
+    await upsertRows("sales", rows as unknown as Row[]);
+  } catch (error) {
+    if (!missingColumn(error)) throw error;
+    const legacy = rows.map((row) => {
+      const copy: Record<string, unknown> = { ...row };
+      delete copy.discount;
+      delete copy.discount_note;
+      return copy;
+    });
+    await upsertRows("sales", legacy as unknown as Row[]);
+    console.warn(
+      "sales: kolom discount/discount_note belum ada — jalankan supabase/migration-005-sale-discount.sql",
+    );
+  }
 }
 
 function itemRows(sales: Sale[]): ItemRow[] {
@@ -120,6 +152,8 @@ export async function loadSales(): Promise<Sale[]> {
     ship: Number(s.ship),
     pack: Number(s.pack),
     other: Number(s.other),
+    discount: Number(s.discount ?? 0),
+    discountNote: s.discount_note ?? "",
     note: s.note ?? undefined,
     payments: paymentsBySale.get(s.id) ?? [],
   }));
@@ -129,7 +163,7 @@ export async function saveSales(prev: Sale[], next: Sale[]): Promise<void> {
   const prevById = new Map(prev.map((s) => [s.id, s]));
   const header = diffRows(saleRows(prev), saleRows(next), (r) => r.id);
 
-  await upsertRows("sales", header.changed as unknown as Row[]);
+  await writeHeaders(header.changed);
   await deleteRows("sales", "id", header.removed);
 
   // Barang & pembayaran sebuah invoice disimpan ulang saat isinya berubah.

@@ -5,6 +5,7 @@ import { addDays, TODAY } from "@/lib/date";
 import { rp } from "@/lib/format";
 import {
   customerStatus,
+  discountOf,
   overdueSales,
   salePaid,
   salePriceHistory,
@@ -59,6 +60,8 @@ export function SaleFormDrawer({
     ship: 0,
     pack: 0,
     other: 0,
+    discount: 0,
+    discountNote: "",
     paid: 0,
   }));
 
@@ -66,7 +69,10 @@ export function SaleFormDrawer({
     const v = variants.find((x) => x.id === i.vid);
     return { ...i, cost: v?.cost ?? 0, stock: v?.stock ?? 0, v };
   });
-  const total = priced.reduce((a, i) => a + i.qty * i.price, 0);
+  const subtotal = priced.reduce((a, i) => a + i.qty * i.price, 0);
+  const discount = discountOf(draft.items, draft.discount);
+  // Total akhir = subtotal barang − diskon (nominal diisi manual oleh user).
+  const total = subtotal - discount;
   const modal = priced.reduce((a, i) => a + i.qty * i.cost, 0);
   const ops = draft.ship + draft.pack + draft.other;
   const profit = total - modal - ops;
@@ -341,6 +347,36 @@ export function SaleFormDrawer({
           </div>
         )}
 
+        <div className="dsec">Diskon (opsional)</div>
+        <div className="grid grid-cols-12 gap-2">
+          <div className="col-span-12 sm:col-span-7">
+            <label className="f" htmlFor="sale-discount-note">
+              Keterangan diskon
+            </label>
+            <input
+              id="sale-discount-note"
+              value={draft.discountNote}
+              maxLength={120}
+              placeholder="Mis. Diskon 5 persen / khusus produk tertentu"
+              onChange={(e) =>
+                setDraft({ ...draft, discountNote: e.target.value })
+              }
+            />
+          </div>
+          <div className="col-span-12 sm:col-span-5">
+            <label className="f">Nominal diskon (Rp)</label>
+            <MoneyInput
+              value={draft.discount}
+              onChange={(discount) => setDraft({ ...draft, discount })}
+            />
+          </div>
+        </div>
+        {draft.discount > subtotal && (
+          <div className="text-[11.5px] mt-1" style={{ color: "var(--er)" }}>
+            Diskon melebihi subtotal — yang dipotong maksimal {rp(subtotal)}.
+          </div>
+        )}
+
         <div className="dsec">Biaya operasional order</div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           <div>
@@ -377,6 +413,21 @@ export function SaleFormDrawer({
         )}
 
         <div className="calcbox">
+          {discount > 0 && (
+            <>
+              <div className="flex justify-between py-1 text-[13px] muted">
+                <span>Subtotal barang</span>
+                <span className="num">{rp(subtotal)}</span>
+              </div>
+              <div className="flex justify-between py-1 text-[13px] muted">
+                <span>
+                  − Diskon
+                  {draft.discountNote.trim() && ` (${draft.discountNote.trim()})`}
+                </span>
+                <span className="num">{rp(discount)}</span>
+              </div>
+            </>
+          )}
           <div className="flex justify-between py-1 font-semibold">
             <span>Total penjualan</span>
             <span className="num">{rp(total)}</span>

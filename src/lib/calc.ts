@@ -14,14 +14,29 @@ import type {
   Variant,
 } from "./types";
 
-export const saleSub = (s: Sale) =>
-  s.items.reduce((a, i) => a + i.qty * i.price, 0);
+/** Jumlah qty × harga jual semua barang, sebelum diskon. */
+export const itemsSub = (items: Pick<SaleItem, "qty" | "price">[]) =>
+  items.reduce((a, i) => a + i.qty * i.price, 0);
+
+/**
+ * Diskon rupiah yang berlaku: nominal yang diisi user, dijaga tidak minus dan
+ * tidak melebihi subtotal supaya total akhir tidak pernah negatif.
+ */
+export const discountOf = (
+  items: Pick<SaleItem, "qty" | "price">[],
+  discount?: number,
+) =>
+  Math.min(Math.max(+(discount ?? 0) || 0, 0), itemsSub(items));
+
+export const saleSub = (s: Sale) => itemsSub(s.items);
+export const saleDiscount = (s: Sale) => discountOf(s.items, s.discount);
 export const saleCost = (s: Sale) =>
   s.items.reduce((a, i) => a + i.qty * i.cost, 0);
 export const saleOps = (s: Sale) =>
   (+s.ship || 0) + (+s.pack || 0) + (+s.other || 0);
-export const saleTotal = (s: Sale) => saleSub(s);
-export const saleProfit = (s: Sale) => saleSub(s) - saleCost(s) - saleOps(s);
+/** Total tagihan = subtotal barang − diskon. */
+export const saleTotal = (s: Sale) => saleSub(s) - saleDiscount(s);
+export const saleProfit = (s: Sale) => saleTotal(s) - saleCost(s) - saleOps(s);
 
 /** Laba kotor per unit (harga jual − modal), sebelum biaya operasional. */
 export const itemProfit = (i: SaleItem) => i.price - i.cost;
@@ -105,7 +120,7 @@ export function saleRequestPosition(
   req: SaleRequest,
   today = TODAY,
 ): PaymentPosition {
-  const total = req.items.reduce((a, i) => a + i.qty * i.price, 0);
+  const total = itemsSub(req.items) - discountOf(req.items, req.discount);
   // COD tidak lagi otomatis lunas — baru lunas lewat pelunasan yang disetujui.
   const paid = +req.paid || 0;
   if (total - paid <= 0) return "Lunas";

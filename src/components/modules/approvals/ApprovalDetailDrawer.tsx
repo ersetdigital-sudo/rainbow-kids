@@ -5,7 +5,9 @@ import { formatDate } from "@/lib/date";
 import { rp } from "@/lib/format";
 import {
   customerStatus,
+  discountOf,
   itemProfit,
+  itemsSub,
   overdueSales,
   paymentPosition,
   purchaseTotal,
@@ -750,7 +752,9 @@ export function ApprovalDetailDrawer({
   if (a.kind === "invoice") {
     const req = a.saleRequest;
     if (!req) return null;
-    const total = req.items.reduce((x, i) => x + i.qty * i.price, 0);
+    const subtotal = itemsSub(req.items);
+    const discount = discountOf(req.items, req.discount);
+    const total = subtotal - discount;
     const modal = req.items.reduce((x, i) => x + i.qty * i.cost, 0);
     const ops = (+req.ship || 0) + (+req.pack || 0) + (+req.other || 0);
     const profit = total - modal - ops;
@@ -852,6 +856,20 @@ export function ApprovalDetailDrawer({
             </div>
           ))}
 
+          {discount > 0 && (
+            <>
+              <div className="flex justify-between py-1.5 text-[13px]">
+                <span style={{ color: "var(--mu)" }}>Subtotal barang</span>
+                <span className="num">{rp(subtotal)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 text-[13px]">
+                <span style={{ color: "var(--mu)" }}>
+                  − Diskon{req.discountNote ? ` (${req.discountNote})` : ""}
+                </span>
+                <span className="num">{rp(discount)}</span>
+              </div>
+            </>
+          )}
           <div className="sdtot">
             <span>Total penjualan</span>
             <span className="num">{rp(total)}</span>
@@ -1391,6 +1409,30 @@ export function ApprovalDetailDrawer({
             </div>
           ))}
         </div>
+
+        {((sale?.discount ?? 0) > 0 || (rev?.discount ?? 0) > 0) && (
+          <div className="sdc">
+            <div className="sdh">
+              <span className="sdi"><Icon name="report" /></span>
+              <span>Diskon</span>
+            </div>
+            <div className="flex justify-between py-1.5 text-[13px]">
+              <span style={{ color: "var(--mu)" }}>
+                {rev?.discountNote || sale?.discountNote || "Nominal diskon"}
+              </span>
+              <span className="num">
+                {(sale?.discount ?? 0) !== (rev?.discount ?? 0) ? (
+                  <>
+                    <s style={{ color: "var(--mu)" }}>{rp(sale?.discount ?? 0)}</s>{" "}
+                    <b style={{ color: "var(--nv)" }}>{rp(rev?.discount ?? 0)}</b>
+                  </>
+                ) : (
+                  <span style={{ color: "var(--mu)" }}>{rp(rev?.discount ?? 0)}</span>
+                )}
+              </span>
+            </div>
+          </div>
+        )}
 
         <div className="sdc">
           <div className="sdh">

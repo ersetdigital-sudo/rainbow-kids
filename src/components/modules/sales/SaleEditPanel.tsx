@@ -2,7 +2,14 @@
 
 import { useState } from "react";
 import { rp } from "@/lib/format";
-import { saleCost, saleOps, saleSub, variantLabel } from "@/lib/calc";
+import {
+  saleCost,
+  saleDiscount,
+  saleOps,
+  saleProfit,
+  saleSub,
+  variantLabel,
+} from "@/lib/calc";
 import { useStore } from "@/lib/store";
 import { MoneyInput } from "@/components/ui/NumericInput";
 import type { Sale } from "@/lib/types";
@@ -23,10 +30,20 @@ export function SaleEditPanel({
   const [ship, setShip] = useState(sale.ship);
   const [pack, setPack] = useState(sale.pack);
   const [other, setOther] = useState(sale.other);
+  const [discount, setDiscount] = useState(sale.discount ?? 0);
+  const [discountNote, setDiscountNote] = useState(sale.discountNote ?? "");
 
-  const next = { ...sale, items, ship: +ship, pack: +pack, other: +other };
-  const nextProfit = saleSub(next) - saleCost(next) - saleOps(next);
-  const curProfit = saleSub(sale) - saleCost(sale) - saleOps(sale);
+  const next: Sale = {
+    ...sale,
+    items,
+    ship: +ship,
+    pack: +pack,
+    other: +other,
+    discount: +discount,
+    discountNote,
+  };
+  const nextProfit = saleProfit(next);
+  const curProfit = saleProfit(sale);
 
   const setPrice = (index: number, price: number) =>
     setItems((list) => list.map((it, i) => (i === index ? { ...it, price } : it)));
@@ -37,6 +54,8 @@ export function SaleEditPanel({
       ship: +ship,
       pack: +pack,
       other: +other,
+      discount: +discount,
+      discountNote: discountNote.trim(),
     });
     toast(res.msg);
     if (res.ok) onClose();
@@ -84,6 +103,26 @@ export function SaleEditPanel({
         ))}
       </div>
 
+      <div className="dsec">Diskon</div>
+      <div className="grid grid-cols-12 gap-2">
+        <div className="col-span-12 sm:col-span-7">
+          <label className="f" htmlFor="edit-discount-note">
+            Keterangan diskon
+          </label>
+          <input
+            id="edit-discount-note"
+            value={discountNote}
+            maxLength={120}
+            placeholder="Mis. Diskon 5 persen / khusus produk tertentu"
+            onChange={(e) => setDiscountNote(e.target.value)}
+          />
+        </div>
+        <div className="col-span-12 sm:col-span-5">
+          <label className="f">Nominal diskon (Rp)</label>
+          <MoneyInput value={discount} onChange={setDiscount} />
+        </div>
+      </div>
+
       <div className="dsec">Biaya operasional order</div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         <div>
@@ -101,9 +140,23 @@ export function SaleEditPanel({
       </div>
 
       <div className="calcbox">
+        {saleDiscount(next) > 0 && (
+          <>
+            <div className="flex justify-between py-1 text-[13px]">
+              <span>Subtotal barang</span>
+              <span className="num">{rp(saleSub(next))}</span>
+            </div>
+            <div className="flex justify-between py-1 text-[13px]">
+              <span>
+                − Diskon{discountNote.trim() && ` (${discountNote.trim()})`}
+              </span>
+              <span className="num">{rp(saleDiscount(next))}</span>
+            </div>
+          </>
+        )}
         <div className="flex justify-between py-1 text-[13px]">
           <span>Total penjualan</span>
-          <span className="num">{rp(saleSub(next))}</span>
+          <span className="num">{rp(saleSub(next) - saleDiscount(next))}</span>
         </div>
         <div className="flex justify-between py-1 text-[13px]">
           <span>− Modal barang</span>

@@ -10,7 +10,6 @@ import {
   saleOps,
   salePaid,
   saleProfit,
-  saleSub,
   saleTotal,
 } from "@/lib/calc";
 import { useStore } from "@/lib/store";
@@ -290,7 +289,7 @@ function ProfitTab({
       key: "sub",
       label: "Penjualan",
       align: "right",
-      render: (s) => <span className="num">{rp(saleSub(s))}</span>,
+      render: (s) => <span className="num">{rp(saleTotal(s))}</span>,
     },
     {
       key: "cost",
@@ -330,7 +329,10 @@ function ProfitTab({
       key: "margin",
       label: "Margin",
       align: "right",
-      render: (s) => `${Math.round((saleProfit(s) / saleSub(s)) * 100)}%`,
+      render: (s) =>
+        saleTotal(s) > 0
+          ? `${Math.round((saleProfit(s) / saleTotal(s)) * 100)}%`
+          : "-",
     },
   ];
 
