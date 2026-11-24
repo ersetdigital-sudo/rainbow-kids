@@ -300,16 +300,43 @@ export function SaleFormDrawer({
                   </div>
                 </div>
                 {info.v && (
-                  <div
-                    className="text-[11.5px] mt-1"
-                    style={{ color: "var(--mu)" }}
-                  >
-                    Standar {rp(info.v.price)} · modal {rp(info.v.cost)}{" "}
-                    (internal) · laba {rp(it.price - info.v.cost)}/unit ·{" "}
-                    {hist
-                      ? `histori jual ${rp(hist.min)} – ${rp(hist.max)} (${hist.count} transaksi, terakhir ${rp(hist.last)})`
-                      : "belum ada histori harga jual"}
-                  </div>
+                  <>
+                    {/* Modal per pcs + total baris: terlihat jelas saat isi harga jual. */}
+                    <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[12.5px]">
+                      <div>
+                        <span style={{ color: "var(--mu)" }}>
+                          Modal / pcs{" "}
+                        </span>
+                        <b>{rp(info.v.cost)}</b>
+                        <span style={{ color: "var(--mu)" }}> · Laba / pcs </span>
+                        <b
+                          style={{
+                            color:
+                              it.price - info.v.cost < 0
+                                ? "var(--er)"
+                                : "var(--ok)",
+                          }}
+                        >
+                          {rp(it.price - info.v.cost)}
+                        </b>
+                      </div>
+                      <div>
+                        <span style={{ color: "var(--mu)" }}>
+                          Total ({it.qty} × {rp(it.price)}){" "}
+                        </span>
+                        <b>{rp(it.qty * it.price)}</b>
+                      </div>
+                    </div>
+                    <div
+                      className="text-[11.5px] mt-0.5"
+                      style={{ color: "var(--mu)" }}
+                    >
+                      Standar {rp(info.v.price)} (internal) ·{" "}
+                      {hist
+                        ? `histori jual ${rp(hist.min)} – ${rp(hist.max)} (${hist.count} transaksi, terakhir ${rp(hist.last)})`
+                        : "belum ada histori harga jual"}
+                    </div>
+                  </>
                 )}
               </div>
             );
